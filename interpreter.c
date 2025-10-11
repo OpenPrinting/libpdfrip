@@ -66,6 +66,28 @@ void process_content_stream(p2c_device_t *dev, pdfio_stream_t *st, pdfio_obj_t *
       {
         device_end_text(dev);
       }
+      else if (!strcmp(token, "Td"))
+      {
+        if (num_operands_ptr == 2)
+        {
+          if (g_verbose) printf("DEBUG: Operator Td (Move Text) with args (%f, %f)\n",num_operands[0], num_operands[1]);
+          device_move_text_cursor(dev, num_operands[0], num_operands[1]);
+        }
+      }
+      else if (!strcmp(token, "TD"))
+      {
+        if (num_operands_ptr == 2)
+        {
+          if (g_verbose) printf("DEBUG: Operator TD (Move text and Set Leading) with args (%f, %f)\n", num_operands[0], num_operands[1]);
+          device_set_text_leading(dev, -num_operands[1]);
+          device_move_text_cursor(dev, num_operands[0], num_operands[1]);
+        }
+      }
+      else if (!strcmp(token, "T*"))
+      {
+        if (g_verbose) printf("DEBUG: Operator T* (Next Line)\n");
+        device_next_line(dev);
+      }
       else if (!strcmp(token, "w"))
       {
         if (num_operands_ptr == 1)

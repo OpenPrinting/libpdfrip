@@ -45,6 +45,8 @@ void device_clip_even_odd(p2c_device_t *dev);
 // --- Text state ---
 void device_begin_text(p2c_device_t *dev);
 void device_end_text(p2c_device_t *dev);
-
+void device_set_text_leading(p2c_device_t *dev, double leading);
+void device_move_text_cursor(p2c_device_t *dev, double tx, double ty);
+void device_next_line(p2c_device_t *dev);
 
 #endif 

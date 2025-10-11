@@ -32,6 +32,7 @@ typedef struct
   double stroke_alpha;  // current stroke alpha
   cairo_matrix_t text_matrix;
   cairo_matrix_t text_line_matrix;
+  double text_leading;
   p2c_colorspace_t fill_colorspace; 
   p2c_colorspace_t stroke_colorspace;
 } graphics_state_t;
@@ -88,6 +89,7 @@ p2c_device_t *device_create(pdfio_rect_t mediabox, int dpi)
   dev->gstack[0].stroke_alpha = 1.0;
   cairo_matrix_init_identity(&dev->gstack[0].text_matrix);
   cairo_matrix_init_identity(&dev->gstack[0].text_line_matrix);
+  dev->gstack[0].text_leading = 0.0;
   dev->gstack[0].fill_colorspace = CS_DEVICE_GRAY;
   dev->gstack[0].stroke_colorspace = CS_DEVICE_GRAY;
   dev->font_dict = NULL;
@@ -443,5 +445,37 @@ void device_end_text(p2c_device_t *dev)
   if (g_verbose)
     printf("DEBUG: End Text Object\n");
   // Nothing to do for positioning, but marks the end of the text object.
+}
+void device_set_text_leading(p2c_device_t *dev, double leading)
+{
+  if (g_verbose)
+    printf("DEBUG: Set Text Leading to %f\n", leading);
+  dev->gstack[dev->gstack_ptr].text_leading = leading;
+}
+
+void device_move_text_cursor(p2c_device_t *dev, double tx, double ty)
+{
+  if (g_verbose)
+    printf("DEBUG: Move Text Cursor by (%f, %f)\n", tx, ty);
+
+  // This operation is defined as a matrix multiplication
+  // Tlm_new = [1 0 0 1 tx ty] * Tlm_old
+  cairo_matrix_t trans_matrix;
+  cairo_matrix_init_translate(&trans_matrix, tx, ty);
+
+  graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
+  cairo_matrix_multiply(&gs->text_line_matrix, &trans_matrix, &gs->text_line_matrix);
+
+  // The text matrix is then set equal to the new text line matrix.
+  memcpy(&gs->text_matrix, &gs->text_line_matrix, sizeof(cairo_matrix_t));
+}
+
+void device_next_line(p2c_device_t *dev)
+{
+  if (g_verbose)
+    printf("DEBUG: Move to Next Line\n");
+  // T* is equivalent to "0 -Tl Td"
+  graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
+  device_move_text_cursor(dev, 0, -gs->text_leading);
 }
 
