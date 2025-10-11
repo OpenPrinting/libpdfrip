@@ -10,6 +10,7 @@ typedef struct cairo_device_s p2c_device_t;
 p2c_device_t *device_create(pdfio_rect_t mediabox, int dpi);
 void device_destroy(p2c_device_t *dev);
 void device_save_to_png(p2c_device_t *dev, const char *filename);
+void device_set_resources(p2c_device_t *dev, pdfio_obj_t *resources);
 
 // --- Graphice State Management ---
 void device_save_state(p2c_device_t *dev);

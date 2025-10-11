@@ -41,6 +41,7 @@ struct cairo_device_s
   cairo_t *cr;
   graphics_state_t gstack[MAX_GSTATE];
   int gstack_ptr;
+  pdfio_dict_t *font_dict;
 };
 
 // --- Device LifeCycle Functions ---
@@ -84,6 +85,7 @@ p2c_device_t *device_create(pdfio_rect_t mediabox, int dpi)
   dev->gstack[0].stroke_alpha = 1.0;
   dev->gstack[0].fill_colorspace = CS_DEVICE_GRAY;
   dev->gstack[0].stroke_colorspace = CS_DEVICE_GRAY;
+  dev->font_dict = NULL;
   dev->gstack_ptr = 0;
 
   // Start with a clean white background
@@ -102,6 +104,31 @@ void device_destroy(p2c_device_t *dev)
     cairo_destroy(dev->cr);
     cairo_surface_destroy(dev->surface);
     free(dev);
+  }
+}
+
+void device_set_resources(p2c_device_t *dev, pdfio_obj_t *resources)
+{
+  if (g_verbose)
+    printf("DEBUG: Settin page resources for the device.\n");
+
+  pdfio_dict_t *res_dict = pdfioObjGetDict(resources);
+  if (!res_dict)
+  {
+    dev->font_dict = NULL;
+    return;
+  }
+
+  pdfio_obj_t *font_res_obj = pdfioDictGetObj(res_dict, "Font");
+  if (font_res_obj)
+  {
+    dev->font_dict = pdfioObjGetDict(font_res_obj);
+    if (g_verbose)
+      printf("DEBUG: Found /Font resourcec dictionary.\n");
+  }
+  else
+  {
+    dev->font_dict = NULL;
   }
 }
 

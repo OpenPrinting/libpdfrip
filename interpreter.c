@@ -17,7 +17,7 @@ static int name_operands_ptr = 0;
 void process_content_stream(p2c_device_t *dev, pdfio_stream_t *st, pdfio_obj_t *resources)
 {
   char token[1024];
-
+  device_set_resources(dev, resources);
   // Reset the operand stacks
   num_operands_ptr = 0;
   name_operands_ptr = 0;
