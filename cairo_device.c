@@ -33,6 +33,7 @@ typedef struct
   cairo_matrix_t text_matrix;
   cairo_matrix_t text_line_matrix;
   double text_leading;
+  double font_size;
   p2c_colorspace_t fill_colorspace; 
   p2c_colorspace_t stroke_colorspace;
 } graphics_state_t;
@@ -90,6 +91,7 @@ p2c_device_t *device_create(pdfio_rect_t mediabox, int dpi)
   cairo_matrix_init_identity(&dev->gstack[0].text_matrix);
   cairo_matrix_init_identity(&dev->gstack[0].text_line_matrix);
   dev->gstack[0].text_leading = 0.0;
+  dev->gstack[0].font_size = 1.0;
   dev->gstack[0].fill_colorspace = CS_DEVICE_GRAY;
   dev->gstack[0].stroke_colorspace = CS_DEVICE_GRAY;
   dev->font_dict = NULL;
@@ -489,5 +491,21 @@ void device_set_text_matrix(p2c_device_t *dev, double a, double b, double c, dou
   // The Tm operator sets both the text matrix and the text line matrix.
   cairo_matrix_init(&gs->text_matrix, a,b,c,d,e,f);
   memcpy(&gs->text_line_matrix, &gs->text_matrix, sizeof(cairo_matrix_t));
+}
+
+void device_set_font(p2c_device_t *dev, const char *font_name, double size)
+{
+  if (g_verbose)
+    printf("DEBUG: Set Font to '%s' at size %f\n", font_name, size);
+
+  graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
+  gs->font_size = size;
+
+  // TODO: Actually look up `font_name` in the resource dictionary
+  // and create a proper cairo_font_face_t. For now, we'll use a 
+  // placeholder font family.
+  cairo_select_font_face(dev->cr, "serif", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+
+  cairo_set_font_size(dev->cr, size);
 }
 

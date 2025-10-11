@@ -95,6 +95,15 @@ void process_content_stream(p2c_device_t *dev, pdfio_stream_t *st, pdfio_obj_t *
           device_set_text_matrix(dev, num_operands[0], num_operands[1], num_operands[2], num_operands[3], num_operands[4], num_operands[5]);
         }
       }
+      else if (!strcmp(token, "Tf"))
+      {
+        if (name_operands_ptr == 1 && num_operands_ptr == 1)
+        {
+          if (g_verbose) printf("DEBUG: Operator Tf (Set Font) with name %s and size %f\n", name_operands[0], num_operands[0]);
+          // The name operand includes the leading '/', so we pass name_operands[0] + 1 to skip it
+          device_set_font(dev, name_operands[0] + 1, num_operands[0]);
+        }
+      }
       else if (!strcmp(token, "w"))
       {
         if (num_operands_ptr == 1)
