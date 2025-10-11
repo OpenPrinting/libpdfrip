@@ -226,6 +226,22 @@ void process_content_stream(p2c_device_t *dev, pdfio_stream_t *st, pdfio_obj_t *
           }
         }
       }
+      else if (!strcmp(token, "k"))
+      {
+        if (num_operands_ptr == 4)
+        {
+          if (g_verbose) printf("DEBUG: Operator k (Set Fill CMYK) with args (%f, %f, %f, %f)\n", num_operands[0], num_operands[1], num_operands[2], num_operands[3]);
+          device_set_fill_cmyk(dev, num_operands[0], num_operands[1], num_operands[2], num_operands[3]);
+        }
+      }
+      else if (!strcmp(token, "K"))
+      {
+        if (num_operands_ptr == 4)
+        {
+          if (g_verbose) printf("DEBUG: Operator K (Set Stroke CMYK) with args (%f, %f, %f, %f)\n",num_operands[0], num_operands[1], num_operands[2], num_operands[3]);
+          device_set_stroke_cmyk(dev, num_operands[0], num_operands[1], num_operands[2], num_operands[3]);
+        }
+      }
       else
       {
         if (g_verbose)

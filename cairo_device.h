@@ -20,7 +20,8 @@ void device_set_stroke_rgb(p2c_device_t *dev, double r, double g, double b);
 void device_set_graphics_state(p2c_device_t *dev, pdfio_obj_t *resources, const char *name);
 void device_set_fill_gray(p2c_device_t *dev, double g);
 void device_set_stroke_gray(p2c_device_t *dev, double g);
-
+void device_set_fill_cmyk(p2c_device_t *dev, double c, double m, double y, double k);
+void device_set_stroke_cmyk(p2c_device_t *dev, double c, double m, double y, double k);
 
 // --- Path Construction ---
 void device_move_to(p2c_device_t *dev, double x, double y);

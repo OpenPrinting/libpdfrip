@@ -8,11 +8,19 @@ extern int g_verbose;
 
 #define MAX_GSTATE 64 // Maximum nesting of graphics states
 
+// Simple CMYK to RGB conversion
+static void cmyk_to_rgb(double c, double m, double y, double k, double *r, double *g, double *b)
+{
+  *r = (1.0 - c) * (1.0 - k);
+  *g = (1.0 - m) * (1.0 - k);
+  *b = (1.0 - y) * (1.0 - k);
+}
 
 typedef enum
 {
   CS_DEVICE_GRAY,
   CS_DEVICE_RGB,
+  CS_DEVICE_CMYK,
 } p2c_colorspace_t;
 
 typedef struct
@@ -191,6 +199,24 @@ void device_set_stroke_gray(p2c_device_t *dev, double g)
   gs->stroke_rgb[1] = g;
   gs->stroke_rgb[2] = g;
   gs->stroke_colorspace = CS_DEVICE_GRAY;
+}
+
+void device_set_fill_cmyk(p2c_device_t *dev, double c, double m, double y, double k)
+{
+  if (g_verbose)
+    printf("DEBUG: Setting fill color to CMYK(%f, %f, %f, %f)\n", c, m, y, k);
+  graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
+  cmyk_to_rgb(c, m, y, k, &gs->fill_rgb[0], &gs->fill_rgb[1], &gs->fill_rgb[2]);
+  gs->fill_colorspace = CS_DEVICE_CMYK;
+}
+
+void device_set_stroke_cmyk(p2c_device_t *dev, double c, double m, double y, double k)
+{
+  if (g_verbose)
+    printf("DEBUG: Setting stroke color to CMYK(%f, %f, %f, %f)\n", c, m, y, k);
+  graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
+  cmyk_to_rgb(c,m,y,k, &gs->stroke_rgb[0], &gs->stroke_rgb[1], &gs->stroke_rgb[2]);
+  gs->stroke_colorspace = CS_DEVICE_CMYK;
 }
 
 void device_set_graphics_state(p2c_device_t *dev, pdfio_obj_t *resources, const char *name)
