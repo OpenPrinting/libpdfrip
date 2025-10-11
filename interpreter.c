@@ -88,6 +88,13 @@ void process_content_stream(p2c_device_t *dev, pdfio_stream_t *st, pdfio_obj_t *
         if (g_verbose) printf("DEBUG: Operator T* (Next Line)\n");
         device_next_line(dev);
       }
+      else if (!strcmp(token, "Tm"))
+      {
+        if (num_operands_ptr == 6)
+        {
+          device_set_text_matrix(dev, num_operands[0], num_operands[1], num_operands[2], num_operands[3], num_operands[4], num_operands[5]);
+        }
+      }
       else if (!strcmp(token, "w"))
       {
         if (num_operands_ptr == 1)

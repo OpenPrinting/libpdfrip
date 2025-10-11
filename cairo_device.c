@@ -479,3 +479,15 @@ void device_next_line(p2c_device_t *dev)
   device_move_text_cursor(dev, 0, -gs->text_leading);
 }
 
+void device_set_text_matrix(p2c_device_t *dev, double a, double b, double c, double d, double e, double f)
+{
+  if (g_verbose)
+    printf("DEBUG: Set Text Matrix to [%f %f %f %f %f %f]\n", a, b, c,d,e,f);
+
+  graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
+
+  // The Tm operator sets both the text matrix and the text line matrix.
+  cairo_matrix_init(&gs->text_matrix, a,b,c,d,e,f);
+  memcpy(&gs->text_line_matrix, &gs->text_matrix, sizeof(cairo_matrix_t));
+}
+

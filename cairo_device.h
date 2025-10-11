@@ -48,5 +48,6 @@ void device_end_text(p2c_device_t *dev);
 void device_set_text_leading(p2c_device_t *dev, double leading);
 void device_move_text_cursor(p2c_device_t *dev, double tx, double ty);
 void device_next_line(p2c_device_t *dev);
+void device_set_text_matrix(p2c_device_t *dev, double a, double b, double c, double d, double e, double f);
 
 #endif 
