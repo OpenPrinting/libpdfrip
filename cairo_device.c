@@ -8,12 +8,24 @@ extern int g_verbose;
 
 #define MAX_GSTATE 64 // Maximum nesting of graphics states
 
+
+typedef enum
+{
+  CS_DEVICE_GRAY,
+  CS_DEVICE_RGB,
+} p2c_colorspace_t;
+
 typedef struct
 {
   double fill_rgb[3];   // Current fill color
   double stroke_rgb[3]; // Current stroke color
   double line_width;    // Current line width
+  double fill_alpha;    // current fill alpha
+  double stroke_alpha;  // current stroke alpha
+  p2c_colorspace_t fill_colorspace; 
+  p2c_colorspace_t stroke_colorspace;
 } graphics_state_t;
+
 
 struct cairo_device_s
 {
@@ -60,6 +72,10 @@ p2c_device_t *device_create(pdfio_rect_t mediabox, int dpi)
   dev->gstack[0].stroke_rgb[1] = 0.0;
   dev->gstack[0].stroke_rgb[2] = 0.0;
   dev->gstack[0].line_width = 1.0;
+  dev->gstack[0].fill_alpha = 1.0;
+  dev->gstack[0].stroke_alpha = 1.0;
+  dev->gstack[0].fill_colorspace = CS_DEVICE_GRAY;
+  dev->gstack[0].stroke_colorspace = CS_DEVICE_GRAY;
   dev->gstack_ptr = 0;
 
   // Start with a clean white background
@@ -141,6 +157,7 @@ void device_set_fill_rgb(p2c_device_t *dev, double r, double g, double b)
   gs->fill_rgb[0] = r;
   gs->fill_rgb[1] = g;
   gs->fill_rgb[2] = b;
+  gs->fill_colorspace = CS_DEVICE_RGB;
 }
 
 void device_set_stroke_rgb(p2c_device_t *dev, double r, double g, double b)
@@ -151,6 +168,29 @@ void device_set_stroke_rgb(p2c_device_t *dev, double r, double g, double b)
   gs->stroke_rgb[0] = r;
   gs->stroke_rgb[1] = g;
   gs->stroke_rgb[2] = b;
+  gs->stroke_colorspace = CS_DEVICE_RGB;
+}
+
+void device_set_fill_gray(p2c_device_t *dev, double g)
+{
+  if (g_verbose)
+    printf("DEBUG: Setting fill color to Gray(%f)\n", g);
+  graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
+  gs->fill_rgb[0] = g;
+  gs->fill_rgb[1] = g;
+  gs->fill_rgb[2] = g;
+  gs->fill_colorspace = CS_DEVICE_GRAY;
+}
+
+void device_set_stroke_gray(p2c_device_t *dev, double g)
+{
+  if (g_verbose)
+    printf("DEBUG: Setting stroke color to Gray(%f)\n", g);
+  graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
+  gs->stroke_rgb[0] = g;
+  gs->stroke_rgb[1] = g;
+  gs->stroke_rgb[2] = g;
+  gs->stroke_colorspace = CS_DEVICE_GRAY;
 }
 
 void device_set_graphics_state(p2c_device_t *dev, pdfio_obj_t *resources, const char *name)
@@ -184,7 +224,25 @@ void device_set_graphics_state(p2c_device_t *dev, pdfio_obj_t *resources, const 
   {
     device_set_line_width(dev, pdfioObjGetNumber(lw_obj));
   }
-  // TODO: Could add support for other states like fill/stroke alpha (ca, CA)
+  
+  // Check for fill alpha
+  pdfio_obj_t *ca_obj = pdfioDictGetObj(gs_dict, "ca");
+  if (ca_obj)
+  {
+    graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
+    gs->fill_alpha = pdfioObjGetNumber(ca_obj);
+    if (g_verbose) printf("DEBUG: Set fill alpha to %f\n", gs->fill_alpha);
+  }
+
+  // Check for stroke alpha
+  pdfio_obj_t *CA_obj = pdfioDictGetObj(gs_dict, "CA");
+  if(CA_obj)
+  {
+    graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
+    gs->stroke_alpha = pdfioObjGetNumber(CA_obj);
+    if (g_verbose) printf("DEBUG: Set stroke alpha to %f\n", gs->stroke_alpha);
+  }
+
 }
 
 // --- Path Construction ---
@@ -232,7 +290,7 @@ void device_stroke(p2c_device_t *dev)
     printf("DEBUG: Paint Stroke\n");
   // Set the source color from our state before stroking
   graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
-  cairo_set_source_rgb(dev->cr, gs->stroke_rgb[0], gs->stroke_rgb[1], gs->stroke_rgb[2]);
+  cairo_set_source_rgba(dev->cr, gs->stroke_rgb[0], gs->stroke_rgb[1], gs->stroke_rgb[2], gs->stroke_alpha);
   cairo_stroke(dev->cr);
 }
 
@@ -242,7 +300,7 @@ void device_fill(p2c_device_t *dev)
     printf("DEBUG: Paint Fill\n");
   // Set the source color from our state before filling
   graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
-  cairo_set_source_rgb(dev->cr, gs->fill_rgb[0], gs->fill_rgb[1], gs->fill_rgb[2]);
+  cairo_set_source_rgba(dev->cr, gs->fill_rgb[0], gs->fill_rgb[1], gs->fill_rgb[2], gs->fill_alpha);
   cairo_fill(dev->cr);
 }
 
@@ -252,7 +310,7 @@ void device_fill_preserve(p2c_device_t *dev)
     printf("DEBUG: Paint Fill Preserve\n");
   // Set the source color from our state before filling
   graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
-  cairo_set_source_rgb(dev->cr, gs->fill_rgb[0], gs->fill_rgb[1], gs->fill_rgb[2]);
+  cairo_set_source_rgba(dev->cr, gs->fill_rgb[0], gs->fill_rgb[1], gs->fill_rgb[2], gs->fill_alpha);
   cairo_fill_preserve(dev->cr);
 }
 
@@ -261,7 +319,7 @@ void device_fill_even_odd(p2c_device_t *dev)
   if (g_verbose)
     printf("DEBUG: Paint Fill (Even/Odd Rule)\n");
   graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
-  cairo_set_source_rgb(dev->cr, gs->fill_rgb[0], gs->fill_rgb[1], gs->fill_rgb[2]);
+  cairo_set_source_rgba(dev->cr, gs->fill_rgb[0], gs->fill_rgb[1], gs->fill_rgb[2], gs->fill_alpha);
   cairo_set_fill_rule(dev->cr, CAIRO_FILL_RULE_EVEN_ODD);
   cairo_fill(dev->cr);
   cairo_set_fill_rule(dev->cr, CAIRO_FILL_RULE_WINDING); // Reset to default
@@ -272,7 +330,7 @@ void device_fill_preserve_even_odd(p2c_device_t *dev)
   if (g_verbose)
     printf("DEBUG: Paint Fill Preserve (Even/Odd Rule)\n");
   graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
-  cairo_set_source_rgb(dev->cr, gs->fill_rgb[0], gs->fill_rgb[1], gs->fill_rgb[2]);
+  cairo_set_source_rgba(dev->cr, gs->fill_rgb[0], gs->fill_rgb[1], gs->fill_rgb[2], gs->fill_alpha);
   cairo_set_fill_rule(dev->cr, CAIRO_FILL_RULE_EVEN_ODD);
   cairo_fill_preserve(dev->cr);
   cairo_set_fill_rule(dev->cr, CAIRO_FILL_RULE_WINDING); // Reset to default

@@ -87,7 +87,7 @@ void process_content_stream(p2c_device_t *dev, pdfio_stream_t *st, pdfio_obj_t *
         if (num_operands_ptr == 1)
         {
           if (g_verbose) printf("DEBUG: Operator g (Set Fill Gray) with arg %f\n", num_operands[0]);
-          device_set_fill_rgb(dev, num_operands[0], num_operands[0], num_operands[0]);
+          device_set_fill_gray(dev, num_operands[0]);
         }
       }
       else if (!strcmp(token, "G"))
@@ -95,7 +95,7 @@ void process_content_stream(p2c_device_t *dev, pdfio_stream_t *st, pdfio_obj_t *
         if (num_operands_ptr == 1)
         {
           if (g_verbose) printf("DEBUG: Operator G (Set Stroke Gray) with arg %f\n", num_operands[0]);
-          device_set_stroke_rgb(dev, num_operands[0], num_operands[0], num_operands[0]);
+          device_set_stroke_gray(dev, num_operands[0]);
         }
       }
       else if (!strcmp(token, "m"))
@@ -197,6 +197,33 @@ void process_content_stream(p2c_device_t *dev, pdfio_stream_t *st, pdfio_obj_t *
         {
           if (g_verbose) printf("DEBUG: Operator gs (Set Graphics State) with name %s\n", name_operands[0]);
           device_set_graphics_state(dev, resources, name_operands[0] + 1);
+        }
+      }
+      else if (!strcmp(token, "cs"))
+      {
+        if (name_operands_ptr == 1)
+        {
+          if (g_verbose) printf("DEBUG: Operator cs (Set fill Color Space) with name %s\n", name_operands[0]);
+          // Note: For now we only support DeviceGray and DeviceRGB
+          if (!strcmp(name_operands[0], "/DeviceRGB"))
+          {
+            // In a full implmentation, you'd call a device function here.
+            // For now, our color-setting operators handle this implicitly.
+            // This block is a placeholder for future color management.
+          }
+        }
+      }
+      else if (!strcmp(token, "CS"))
+      {
+        if (name_operands_ptr == 1)
+        {
+          if (g_verbose) printf("DEBUG: Operator CS (Set Stroke Color Space) with name %s \n", name_operands[0]);
+          if (!strcmp(name_operands[0], "/DeviceRGB"))
+          {
+            // In a full implementation, you'd call a device function here.
+            // For now, our color-setting operators handle this implictily.
+            // This block is a placeholder for future color management.
+          }
         }
       }
       else
