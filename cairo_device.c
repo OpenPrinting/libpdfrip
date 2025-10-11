@@ -42,6 +42,7 @@ struct cairo_device_s
   graphics_state_t gstack[MAX_GSTATE];
   int gstack_ptr;
   pdfio_dict_t *font_dict;
+  pdfio_dict_t *xobject_dict;
 };
 
 // --- Device LifeCycle Functions ---
@@ -86,6 +87,7 @@ p2c_device_t *device_create(pdfio_rect_t mediabox, int dpi)
   dev->gstack[0].fill_colorspace = CS_DEVICE_GRAY;
   dev->gstack[0].stroke_colorspace = CS_DEVICE_GRAY;
   dev->font_dict = NULL;
+  dev->xobject_dict = NULL;
   dev->gstack_ptr = 0;
 
   // Start with a clean white background
@@ -130,6 +132,19 @@ void device_set_resources(p2c_device_t *dev, pdfio_obj_t *resources)
   {
     dev->font_dict = NULL;
   }
+  
+  pdfio_obj_t *xobject_res_obj = pdfioDictGetObj(res_dict, "XObject");
+  if (xobject_res_obj)
+  {
+    dev->xobject_dict = pdfioObjGetDict(xobject_res_obj);
+    if (g_verbose)
+      printf("DEBUG: Found /XObject resource dictionary.\n");
+  }
+  else
+  {
+    dev->xobject_dict = NULL;
+  }
+
 }
 
 void device_save_to_png(p2c_device_t *dev, const char *filename)
