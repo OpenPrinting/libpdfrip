@@ -50,5 +50,6 @@ void device_move_text_cursor(p2c_device_t *dev, double tx, double ty);
 void device_next_line(p2c_device_t *dev);
 void device_set_text_matrix(p2c_device_t *dev, double a, double b, double c, double d, double e, double f);
 void device_set_font(p2c_device_t *dev, const char *font_name, double size);
+void device_show_text(p2c_device_t *dev, const char *str);
 
 #endif 

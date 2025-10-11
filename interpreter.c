@@ -13,6 +13,8 @@ static double num_operands[MAX_OPERANDS];
 static int num_operands_ptr = 0;
 static char name_operands[MAX_OPERANDS][1024];
 static int name_operands_ptr = 0;
+static char string_operands[MAX_OPERANDS][1024];
+static int string_operands_ptr = 0;
 
 void process_content_stream(p2c_device_t *dev, pdfio_stream_t *st, pdfio_obj_t *resources)
 {
@@ -43,6 +45,22 @@ void process_content_stream(p2c_device_t *dev, pdfio_stream_t *st, pdfio_obj_t *
         if (g_verbose)
           printf("DEBUG: Pushed name: %s\n", token);
         strcpy(name_operands[name_operands_ptr++], token);
+      }
+    }
+    else if (token[0] == '(' )
+    {
+      // We have a string, push it on the string operand stack
+      if (string_operands_ptr < MAX_OPERANDS)
+      {
+        // Copy the string, removing the leading '(' and trailing ')'
+        size_t len = strlen(token);
+        if (len > 1 && token[len - 1] == ')')
+        {
+          strncpy(string_operands[string_operands_ptr], token + 1, len - 2);
+          string_operands[string_operands_ptr][len - 2] = '\0'; // Null-terminate
+          if (g_verbose) printf("DEBUG: Pushed string: \"%s\"\n", string_operands[string_operands_ptr]);
+          string_operands_ptr++;
+        }
       }
     }
     else
@@ -102,6 +120,14 @@ void process_content_stream(p2c_device_t *dev, pdfio_stream_t *st, pdfio_obj_t *
           if (g_verbose) printf("DEBUG: Operator Tf (Set Font) with name %s and size %f\n", name_operands[0], num_operands[0]);
           // The name operand includes the leading '/', so we pass name_operands[0] + 1 to skip it
           device_set_font(dev, name_operands[0] + 1, num_operands[0]);
+        }
+      }
+      else if (!strcmp(token, "Tj"))
+      {
+        if (string_operands_ptr == 1)
+        {
+          if (g_verbose) printf("DEBUG: Operator Tj (Show Text) with string \"%s\"\n", string_operands[0]);
+          device_show_text(dev, string_operands[0]);
         }
       }
       else if (!strcmp(token, "w"))
@@ -297,6 +323,7 @@ void process_content_stream(p2c_device_t *dev, pdfio_stream_t *st, pdfio_obj_t *
       // Clear the operand stacks for the next command
       num_operands_ptr = 0;
       name_operands_ptr = 0;
+      string_operands_ptr = 0;
     }
   }
 }

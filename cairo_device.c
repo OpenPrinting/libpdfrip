@@ -34,6 +34,7 @@ typedef struct
   cairo_matrix_t text_line_matrix;
   double text_leading;
   double font_size;
+  char font_name[128];
   p2c_colorspace_t fill_colorspace; 
   p2c_colorspace_t stroke_colorspace;
 } graphics_state_t;
@@ -501,11 +502,56 @@ void device_set_font(p2c_device_t *dev, const char *font_name, double size)
   graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
   gs->font_size = size;
 
-  // TODO: Actually look up `font_name` in the resource dictionary
-  // and create a proper cairo_font_face_t. For now, we'll use a 
-  // placeholder font family.
+  strncpy(gs->font_name, font_name, sizeof(gs->font_name) -1 );
+  gs->font_name[sizeof(gs->font_name) - 1] = '\0';
+
   cairo_select_font_face(dev->cr, "serif", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
 
   cairo_set_font_size(dev->cr, size);
+}
+
+void device_show_text(p2c_device_t *dev, const char *str)
+{
+  if (g_verbose)
+    printf("DEBUG: Show Text: \"%s\"\n", str);
+
+  graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
+
+  // 1. Set the fill color for the text
+  cairo_set_source_rgb(dev->cr, gs->fill_rgb[0], gs->fill_rgb[1], gs->fill_rgb[2]);
+
+  // 2. Perform our crude font substitution guess
+  if (strstr(gs->font_name, "Times") != NULL)
+  {
+    cairo_select_font_face(dev->cr, "serif", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+  }
+  else if (strstr(gs->font_name, "Helvetica") != NULL)
+  {
+    cairo_select_font_face(dev->cr, "sans-serif", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  }
+  else
+  {
+    // Default fallback
+    cairo_select_font_face(dev->cr, "monospace", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  }
+
+  // 3. Set the font size
+  cairo_set_font_size(dev->cr, gs->font_size);
+
+  // 4. Save Cairo sate, apply the PDF text matrix, draw, and restore
+  // This ensures text is postiioned and rotated correctly without messing up 
+  // other drawing operations.
+  cairo_save(dev->cr);
+
+  cairo_transform(dev->cr, &gs->text_matrix);
+  cairo_move_to(dev->cr, 0, 0);
+  cairo_show_text(dev->cr, str);
+
+  cairo_restore(dev->cr);
+
+  // 5. update the text matrix for the next piece of text
+  cairo_text_extents_t extents;
+  cairo_text_extents(dev->cr, str, &extents);
+  cairo_matrix_translate(&gs->text_matrix, extents.x_advance, 0);
 }
 
