@@ -58,6 +58,14 @@ void process_content_stream(p2c_device_t *dev, pdfio_stream_t *st, pdfio_obj_t *
         if (g_verbose) printf("DEBUG: Operator Q (Restore State)\n");
         device_restore_state(dev);
       }
+      else if (!strcmp(token, "BT"))
+      {
+        device_begin_text(dev);
+      }
+      else if (!strcmp(token, "ET"))
+      {
+        device_end_text(dev);
+      }
       else if (!strcmp(token, "w"))
       {
         if (num_operands_ptr == 1)

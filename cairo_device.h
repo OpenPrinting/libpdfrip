@@ -42,5 +42,9 @@ void device_fill_preserve_even_odd(p2c_device_t *dev);
 void device_clip(p2c_device_t *dev);
 void device_clip_even_odd(p2c_device_t *dev);
 
+// --- Text state ---
+void device_begin_text(p2c_device_t *dev);
+void device_end_text(p2c_device_t *dev);
+
 
 #endif 

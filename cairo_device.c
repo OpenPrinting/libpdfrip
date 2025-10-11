@@ -30,6 +30,8 @@ typedef struct
   double line_width;    // Current line width
   double fill_alpha;    // current fill alpha
   double stroke_alpha;  // current stroke alpha
+  cairo_matrix_t text_matrix;
+  cairo_matrix_t text_line_matrix;
   p2c_colorspace_t fill_colorspace; 
   p2c_colorspace_t stroke_colorspace;
 } graphics_state_t;
@@ -84,6 +86,8 @@ p2c_device_t *device_create(pdfio_rect_t mediabox, int dpi)
   dev->gstack[0].line_width = 1.0;
   dev->gstack[0].fill_alpha = 1.0;
   dev->gstack[0].stroke_alpha = 1.0;
+  cairo_matrix_init_identity(&dev->gstack[0].text_matrix);
+  cairo_matrix_init_identity(&dev->gstack[0].text_line_matrix);
   dev->gstack[0].fill_colorspace = CS_DEVICE_GRAY;
   dev->gstack[0].stroke_colorspace = CS_DEVICE_GRAY;
   dev->font_dict = NULL;
@@ -423,3 +427,21 @@ void device_clip_even_odd(p2c_device_t *dev)
   cairo_clip(dev->cr);
   cairo_new_path(dev->cr); // Clipping consumes the path, start a new one
 }
+
+// --- Text State ---
+void device_begin_text(p2c_device_t *dev)
+{
+  if (g_verbose)
+    printf("DEBUG: Begin Text Object\n");
+  graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
+  cairo_matrix_init_identity(&gs->text_matrix);
+  cairo_matrix_init_identity(&gs->text_line_matrix);
+}
+
+void device_end_text(p2c_device_t *dev)
+{
+  if (g_verbose)
+    printf("DEBUG: End Text Object\n");
+  // Nothing to do for positioning, but marks the end of the text object.
+}
+
