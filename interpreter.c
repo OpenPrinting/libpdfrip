@@ -1,4 +1,4 @@
-#include "interpreter.hh"
+#include "interpreter.h"
 #include "cairo_device.h"
 #include <ctype.h>
 #include <stdio.h>
@@ -8,23 +8,6 @@
 // Use the global verbose flag defined in the main file
 extern int g_verbose;
 
-// --- Unified Operand Stack ---
-
-typedef enum {
-  OP_TYPE_NONE,
-  OP_TYPE_NUMBER,
-  OP_TYPE_NAME,
-  OP_TYPE_STRING
-} operand_type_t;
-
-typedef struct {
-  operand_type_t type;
-  union {
-    double number;
-    char name[1024];
-    char string[1024];
-  } value;
-} operand_t;
 
 #define MAX_OPERANDS 256
 static operand_t operand_stack[MAX_OPERANDS];

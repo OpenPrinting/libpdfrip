@@ -1,8 +1,9 @@
 #ifndef INTERPRETER_H
 #define INTERPRETER_H
 
-#include "cairo_device.h"
 #include "pdfio.h"
+
+typedef struct cairo_device_s p2c_device_t;
 
 // Defines the types of operands that can be on the stack
 typedef enum {
