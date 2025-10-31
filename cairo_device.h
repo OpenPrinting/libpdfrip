@@ -4,6 +4,7 @@
 #include <cairo/cairo.h>
 #include "pdfio.h"
 #include "interpreter.h"
+#include <ft2build.h>
 
 typedef struct cairo_device_s p2c_device_t;
 
@@ -53,5 +54,7 @@ void device_set_text_matrix(p2c_device_t *dev, double a, double b, double c, dou
 void device_set_font(p2c_device_t *dev, const char *font_name, double size);
 void device_show_text(p2c_device_t *dev, const char *str);
 void device_show_text_kerning(p2c_device_t *dev, operand_t  *operands, int num_operands);
+void device_set_text_rendering_mode(p2c_device_t *dev, int mode);
+void device_set_page(p2c_device_t *dev, pdfio_obj_t *page);
 
 #endif 

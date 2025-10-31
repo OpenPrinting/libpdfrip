@@ -62,6 +62,7 @@ static void handle_Tm(p2c_device_t *dev, pdfio_obj_t *resources) {
 }
 
 static void handle_Tf(p2c_device_t *dev, pdfio_obj_t *resources) {
+    printf("\n\n>>>>>>>>>>> TF <<<<<<<<<<<<<\n\n");
     if (operand_stack_ptr == 2 && operand_stack[0].type == OP_TYPE_NAME && operand_stack[1].type == OP_TYPE_NUMBER) {
         if (g_verbose) printf("DEBUG: Operator Tf (Set Font) with name %s and size %f\n", operand_stack[0].value.name, operand_stack[1].value.number);
         device_set_font(dev, operand_stack[0].value.name + 1, operand_stack[1].value.number); // +1 to skip leading '/'
@@ -239,6 +240,21 @@ static void handle_K(p2c_device_t *dev, pdfio_obj_t *resources) {
 }
 
 
+static void handle_Tr(p2c_device_t *dev, pdfio_obj_t *resources) {
+    if (operand_stack_ptr == 1 && operand_stack[0].type == OP_TYPE_NUMBER) {
+        int mode = (int)operand_stack[0].value.number;
+        if (g_verbose) printf("DEBUG: Operator Tr (Set Text Rendering Mode) with mode %d\n", mode);
+        // This is a placeholder for the actual device function you'll write
+        // For now, let's just imagine it exists
+        // device_set_text_rendering_mode(dev, mode);
+        // Since our state is in the internal header, we can set it directly
+        // from here for simplicity, but a dedicated function is cleaner.
+        // For now, let's assume we don't have that function yet. We'll add it to graphics_state_t.
+        // This is a simplified approach, a dedicated function in cairo_device.c would be better.
+        device_set_text_rendering_mode(dev, mode);
+    }
+}
+
 // --- Dispatch Table and Logic ---
 
 // 1. Define a type for our handler functions
@@ -265,11 +281,12 @@ static const pdf_operator_t operator_table[] = {
     {"S", handle_S},
     {"T*", handle_T_star},
     {"TD", handle_TD},
-    {"Td", handle_Td},
-    {"Tf", handle_Tf},
     {"TJ", handle_TJ},
-    {"Tj", handle_Tj},
-    {"Tm", handle_Tm},
+    {"Td", handle_Td},       // Correct Position
+    {"Tf", handle_Tf},       // Correct Position
+    {"Tj", handle_Tj},       // Correct Position
+    {"Tm", handle_Tm},       // Correct Position
+    {"Tr", handle_Tr},       // Correct Position
     {"W", handle_W},
     {"W*", handle_W_star},
     {"b", handle_b},
@@ -290,6 +307,7 @@ static const pdf_operator_t operator_table[] = {
     {"rg", handle_rg},
     {"w", handle_w},
 };
+
 static const size_t operator_table_size = sizeof(operator_table) / sizeof(operator_table[0]);
 
 // 4. Create a comparison function for bsearch
@@ -308,6 +326,7 @@ void process_content_stream(p2c_device_t *dev, pdfio_stream_t *st, pdfio_obj_t *
 
   while (pdfioStreamGetToken(st, token, sizeof(token)))
   {
+    if (g_verbose) fprintf(stderr, "DEBUG: Token: '%s'\n", token);
     if (isdigit(token[0]) || (token[0] == '-' && isdigit(token[1])) || (token[0] == '+' && isdigit(token[1])) || token[0] == '.')
     {
         // We have a number, push it on the operand stack
@@ -332,14 +351,23 @@ void process_content_stream(p2c_device_t *dev, pdfio_stream_t *st, pdfio_obj_t *
     {
         // We have a string, push it on the operand stack
         if (operand_stack_ptr < MAX_OPERANDS) {
+            operand_t *op = &operand_stack[operand_stack_ptr++];
+            op->type = OP_TYPE_STRING;
+
             size_t len = strlen(token);
+
+            // Check if string ends with ')'
             if (len > 1 && token[len - 1] == ')') {
-                operand_t *op = &operand_stack[operand_stack_ptr++];
-                op->type = OP_TYPE_STRING;
+                // String is complete: (text)
                 strncpy(op->value.string, token + 1, len - 2);
-                op->value.string[len - 2] = '\0'; // Null-terminate
-                if (g_verbose) printf("DEBUG: Pushed string: \"%s\"\n", op->value.string);
+                op->value.string[len - 2] = '\0';
+            } else {
+                // String doesn't end with ')': (text
+                strncpy(op->value.string, token + 1, len - 1);
+                op->value.string[len - 1] = '\0';
             }
+
+            if (g_verbose) fprintf(stderr, "DEBUG: Pushed string: \"%s\"\n", op->value.string);
         }
     }
     // Note: We are ignoring array tokens `[` and `]` for now.

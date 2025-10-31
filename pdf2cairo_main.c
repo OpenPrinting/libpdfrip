@@ -237,6 +237,7 @@ main(int argc, // I - Number of command-line args
     p2c_device_t *dev = device_create(mediabox, dpi);
     if (dev)
     {
+      device_set_page(dev, page);
       if (g_verbose)
         printf("DEBUG: Cairo device created.\n");
 
