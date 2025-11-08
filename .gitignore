@@ -1,0 +1,5 @@
+*.o
+pdf2cairo/*.o
+testpdf2cairo
+pdf2cairo/pdf2cairo_main
+testfiles/renderer-output/
