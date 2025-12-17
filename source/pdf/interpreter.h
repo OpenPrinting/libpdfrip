@@ -1,7 +1,7 @@
 #ifndef INTERPRETER_H
 #define INTERPRETER_H
 
-#include "pdfio.h"
+#include <pdfio.h>
 
 typedef struct cairo_device_s p2c_device_t;
 
@@ -31,6 +31,7 @@ typedef struct {
  * @param[in] st The PDF content stream to read the commands from.
  * @param[in] resources The page's resource dictionary.
  */
-void process_content_stream(p2c_device_t *dev, pdfio_stream_t *st, pdfio_obj_t *resources);
+void process_content_stream(p2c_device_t *dev, pdfrip_page_t *page_data);
+		
 
 #endif // INTERPRETER_H

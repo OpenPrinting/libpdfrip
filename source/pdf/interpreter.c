@@ -317,10 +317,11 @@ static int compare_operators(const void *a, const void *b) {
     return strcmp(token, op->name);
 }
 
-void process_content_stream(p2c_device_t *dev, pdfio_stream_t *st, pdfio_obj_t *resources)
+void process_content_stream(p2c_device_t *dev, pdfrip_page_t *page_data)
 {
+  pdfio_stream_t *st = pdfioObjOpenStream(page_data->object, true);
   char token[1024];
-  device_set_resources(dev, resources);
+  device_set_resources(dev, page_data->resources_dict);
   // Reset the operand stacks
   operand_stack_ptr = 0;
 
