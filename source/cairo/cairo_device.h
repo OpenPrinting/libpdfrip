@@ -2,7 +2,7 @@
 #define CAIRO_DEVICE_H
 
 #include <cairo/cairo.h>
-#include "pdfio.h"
+#include <pdfio.h>
 #include "interpreter.h"
 #include <ft2build.h>
 
