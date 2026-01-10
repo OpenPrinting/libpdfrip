@@ -29,10 +29,12 @@ void 	      freePDFdoc(pdfrip_doc_t *PDF_data);	// free the data structure
 typedef struct pdfrip_page_s
 {
   pdfio_obj_t		*object;		// Page Object
+  pdfio_obj_t		*resource_object;	// Page Resource Object
   pdfio_dict_t		*object_dict,		// Page Dictionary
 			*resources_dict;	// Page Resources Dictionary 	
   pdfio_rect_t 		mediaBox;		// Page MediaBox 
-  size_t 		object_number; 		// Object Number
+  size_t 		object_number, 		// Object Number
+  	 		num_streams;		// Number of Object Streams
   unsigned short 	gen_number;		// Object Generation Number
 } pdfrip_page_t;
 

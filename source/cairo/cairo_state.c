@@ -15,6 +15,29 @@ cmyk_to_rgb(double c, double m, double y, double k, 	// I - c, m, y, k values
   *b = (1.0 - y) * (1.0 - k);
 }
 
+//
+// 'device_transform()' - Modifies the Current Transformation Matrix (CTM)
+//                        (corresponding to the 'cm' operator).
+//
+
+void                              // O - Void
+device_transform(p2c_device_t *dev,    // I - Active Rendering Context
+                 double a, double b,   // I - Matrix components
+                 double c, double d,
+                 double e, double f)
+{
+  cairo_matrix_t matrix;
+
+  if (g_verbose)
+    printf("DEBUG: Applying Transform Matrix: [%f %f %f %f %f %f]\n", a, b, c, d, e, f);
+
+  // Initialize a cairo matrix with the PDF operands
+  cairo_matrix_init(&matrix, a, b, c, d, e, f);
+
+  // Apply the transformation to the current context
+  cairo_transform(dev->cr, &matrix);
+}
+
 // --- Graphics State Management ---
 
 //
@@ -237,14 +260,13 @@ device_set_stroke_cmyk(p2c_device_t *dev, 	// I - Active Rendering Context
 
 void 							  // O - Void
 device_set_graphics_state(p2c_device_t *dev, 		// I - Active Rendering Context
-			  pdfio_obj_t *resources, 	// I - resource dictionary of page
+			  pdfio_dict_t *res_dict, 	// I - resource dictionary of page
 			  const char *name)		// I - Name of GS state to apply
 {
   if (g_verbose)
     printf("DEBUG: Applying graphics state dictionary: /%s\n", name);
 
   // Retrieve the main dictionary from the page resources object
-  pdfio_dict_t *res_dict = pdfioObjGetDict(resources);
   if (!res_dict)  
     return;
 

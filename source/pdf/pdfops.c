@@ -111,6 +111,7 @@ getPageData(pdfio_file_t *pdf,		// I - PDF file
 
   page->object_number = pdfioObjGetNumber(page->object);
   page->gen_number = pdfioObjGetGeneration(page->object);
+  page->num_streams = pdfioPageGetNumStreams(page->object);
 
   return page;
 }

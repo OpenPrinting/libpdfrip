@@ -7,12 +7,14 @@
 #include <ft2build.h>
 
 typedef struct cairo_device_s p2c_device_t;
+	
+void device_transform(p2c_device_t *dev, double a, double b, double c, double d, double e, double f);
 
 // --- Device Lifecycle ---
 p2c_device_t *device_create(pdfio_rect_t mediabox, int dpi);
 void device_destroy(p2c_device_t *dev);
 void device_save_to_png(p2c_device_t *dev, const char *filename);
-void device_set_resources(p2c_device_t *dev, pdfio_obj_t *resources);
+void device_set_resources(p2c_device_t *dev, pdfio_dict_t *res_dict);
 
 // --- Graphice State Management ---
 void device_save_state(p2c_device_t *dev);
@@ -20,7 +22,7 @@ void device_restore_state(p2c_device_t *dev);
 void device_set_line_width(p2c_device_t *dev, double width);
 void device_set_fill_rgb(p2c_device_t *dev, double r, double g, double b);
 void device_set_stroke_rgb(p2c_device_t *dev, double r, double g, double b);
-void device_set_graphics_state(p2c_device_t *dev, pdfio_obj_t *resources, const char *name);
+void device_set_graphics_state(p2c_device_t *dev, pdfio_dict_t *res_dict, const char *name);
 void device_set_fill_gray(p2c_device_t *dev, double g);
 void device_set_stroke_gray(p2c_device_t *dev, double g);
 void device_set_fill_cmyk(p2c_device_t *dev, double c, double m, double y, double k);

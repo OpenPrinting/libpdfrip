@@ -117,13 +117,12 @@ device_destroy(p2c_device_t *dev)	// I - pointer to structure to be freed
 
 void 						  // O - Void
 device_set_resources(p2c_device_t *dev, 	// I - active Rendering context
-		     pdfio_obj_t *resources)	// I - resource dictionary of page
+		     pdfio_dict_t *res_dict)	// I - resource dictionary of page
 {
   if (g_verbose)
     printf("DEBUG: Setting page resources for the device.\n");
 
   // Retrieve the dictionary from the provided PDF resource object
-  pdfio_dict_t *res_dict = pdfioObjGetDict(resources);
   if (!res_dict)
   {
     // If no dictionary exists, clear internal pointers and return

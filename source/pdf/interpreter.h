@@ -2,6 +2,7 @@
 #define INTERPRETER_H
 
 #include <pdfio.h>
+#include "pdfops-private.h"
 
 typedef struct cairo_device_s p2c_device_t;
 

@@ -33,12 +33,13 @@ SRCS_CAIRO = source/cairo/cairo_device.c \
 
 # 3. The PDF Operations (in source/pdf)
 SRCS_PDF   = source/pdf/pdfops.c \
-             source/tools/pdf2cairo/interpreter.c
+             source/pdf/interpreter.c
 
 # Combine all sources
 SRCS = $(SRCS_TOOL) $(SRCS_CAIRO) $(SRCS_PDF)
 OBJS = $(SRCS:.c=.o)
-BIN  = pdf2cairo
+BIN  = source/tools/pdf2cairo/pdf2cairo
+
 
 # --- Targets ---
 

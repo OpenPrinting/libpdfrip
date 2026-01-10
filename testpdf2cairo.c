@@ -78,7 +78,7 @@ int main(void)
     // Format the command that will be run
     // *** THIS LINE IS UPDATED ***
     // It now points to the new path in the same directory.
-    snprintf(command, sizeof(command), "./pdf2cairo/pdf2cairo_main %s%s%s%s",
+    snprintf(command, sizeof(command), "./source/tools/pdf2cairo/pdf2cairo %s%s%s%s",
         tests[i].input_args,
         (tests[i].input_args[0]!='\0') ? " ": "",
         input_path,

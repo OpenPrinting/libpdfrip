@@ -1349,7 +1349,7 @@ load_embedded_font(p2c_device_t *dev, 			// I - Active Rendering Context
   FT_Set_Char_Size(gs->ft_face, 0, (FT_F26Dot6)(font_size * 64), 72, 72);
    
   // Set encoding map
-  gs->encoding_map = WIN_ANSI_ENCODING;
+//  gs->encoding_map = WIN_ANSI_ENCODING;
   
   // Store font data pointer so we can free it later
   // You'll need to add a field to graphics_state_t: unsigned char *font_data;
