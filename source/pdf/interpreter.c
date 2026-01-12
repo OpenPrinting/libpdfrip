@@ -1,3 +1,12 @@
+//
+// Copyright 2025 Yash Kumar Kasaudhan <vididvidid@gmail.com>
+// Copyright 2025-2026 Uddhav Phatak <uddhavphatak@gmail.com>
+//
+// Licensed under Apache License v2.0.  See the file "LICENSE" for more
+// information.
+//
+
+
 #include "interpreter.h"
 #include "cairo_device.h"
 #include <ctype.h>
