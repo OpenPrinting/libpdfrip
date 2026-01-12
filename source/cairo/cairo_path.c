@@ -259,3 +259,23 @@ device_clip_even_odd(p2c_device_t *dev)		// I - Active Rendering Context
   // Clear the path.
   cairo_new_path(dev->cr);
 }
+
+//
+// 'device_get_current_point()' - Retrieves the current point from the Cairo path.
+//                                Used for 'v' operator.
+//
+
+void                              			  // O - Void
+device_get_current_point(p2c_device_t *dev, 		// I - Active Rendering Context
+                         double *x, double *y) 		// O - Current X and Y
+{
+  if (cairo_has_current_point(dev->cr))
+  {
+    cairo_get_current_point(dev->cr, x, y);
+  }
+  else
+  {
+    *x = 0.0;
+    *y = 0.0;
+  }
+}

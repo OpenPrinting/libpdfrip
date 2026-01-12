@@ -213,6 +213,46 @@ handle_c(p2c_device_t *dev,
   }
 }
 
+static void
+handle_v(p2c_device_t *dev,
+         pdfio_dict_t *resources)
+{
+  // v: Append curved segment (x2, y2, x3, y3).
+  // Current point is (x1, y1).
+  if (operand_stack_ptr == 4)
+  {
+    double x1, y1;
+    device_get_current_point(dev, &x1, &y1); // Get current point for x1, y1
+
+    double x2 = operand_stack[0].value.number;
+    double y2 = operand_stack[1].value.number;
+    double x3 = operand_stack[2].value.number;
+    double y3 = operand_stack[3].value.number;
+
+    if (g_verbose) printf("DEBUG: Operator v (Curve) %f %f %f %f\n", x2, y2, x3, y3);
+    device_curve_to(dev, x1, y1, x2, y2, x3, y3);
+  }
+}
+
+static void
+handle_y(p2c_device_t *dev,
+         pdfio_dict_t *resources)
+{
+  // y: Append curved segment (x1, y1, x3, y3).
+  // Final point (x3, y3) is also (x2, y2).
+  if (operand_stack_ptr == 4)
+  {
+    double x1 = operand_stack[0].value.number;
+    double y1 = operand_stack[1].value.number;
+    double x3 = operand_stack[2].value.number;
+    double y3 = operand_stack[3].value.number;
+
+    if (g_verbose) printf("DEBUG: Operator y (Curve) %f %f %f %f\n", x1, y1, x3, y3);
+    // Pass x3, y3 as both the second control point and the end point
+    device_curve_to(dev, x1, y1, x3, y3, x3, y3);
+  }
+}
+
 static void 
 handle_re(p2c_device_t *dev, 
 	  pdfio_dict_t *resources) 
@@ -433,11 +473,11 @@ static const pdf_operator_t operator_table[] = {
     {"T*", handle_T_star},
     {"TD", handle_TD},
     {"TJ", handle_TJ},
-    {"Td", handle_Td},       // Correct Position
-    {"Tf", handle_Tf},       // Correct Position
-    {"Tj", handle_Tj},       // Correct Position
-    {"Tm", handle_Tm},       // Correct Position
-    {"Tr", handle_Tr},       // Correct Position
+    {"Td", handle_Td},
+    {"Tf", handle_Tf},
+    {"Tj", handle_Tj},
+    {"Tm", handle_Tm},
+    {"Tr", handle_Tr},
     {"W", handle_W},
     {"W*", handle_W_star},
     {"b", handle_b},
@@ -457,7 +497,9 @@ static const pdf_operator_t operator_table[] = {
     {"q", handle_q},
     {"re", handle_re},
     {"rg", handle_rg},
+    {"v", handle_v},
     {"w", handle_w},
+    {"y", handle_y},
 };
 
 static const size_t operator_table_size = sizeof(operator_table) / sizeof(operator_table[0]);
