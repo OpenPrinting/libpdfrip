@@ -1073,6 +1073,330 @@ static name_map_t	unicode_map[] =
   { "zeta",		0x03b6 }
 };
 
+//
+// 'load_encoding()' - Load the encoding for a font.
+//
+// DIRECTLY FROM pdf2text.c
+//
+
+static void
+load_encoding(
+    pdfio_obj_t   *page_obj,		// I - Page object
+    const char    *name,		// I - Font name
+    int           encoding[256])	// O - Encoding table
+{
+  size_t	i, j;			// Looping vars
+  pdfio_dict_t	*page_dict,		// Page dictionary
+		*resources_dict,	// Resources dictionary
+		*font_dict;		// Font dictionary
+  pdfio_obj_t	*font_obj,		// Font object
+		*encoding_obj;		// Encoding object
+  pdfio_dict_t	*encoding_dict;		// Encoding dictionary
+  const char	*base_encoding;		// BaseEncoding name
+  pdfio_array_t	*differences;		// Differences array
+  static int	win_ansi[32] =		// WinANSI characters from 128 to 159
+  {
+    0x20AC, 0x0000, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021,
+    0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x0000, 0x017D, 0x0000,
+    0x0000, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
+    0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x0000, 0x017E, 0x0178
+  };
+  static int	mac_roman[128] =	// MacRoman characters from 128 to 255
+  {
+    0x00C4, 0x00C5, 0x00C7, 0x00C9, 0x00D1, 0x00D6, 0x00DC, 0x00E1,
+    0x00E0, 0x00E2, 0x00E4, 0x00E3, 0x00E5, 0x00E7, 0x00E9, 0x00E8,
+    0x00EA, 0x00EB, 0x00ED, 0x00EC, 0x00EE, 0x00EF, 0x00F1, 0x00F3,
+    0x00F2, 0x00F4, 0x00F6, 0x00F5, 0x00FA, 0x00F9, 0x00FB, 0x00FC,
+
+    0x2020, 0x00B0, 0x00A2, 0x00A3, 0x00A7, 0x2022, 0x00B6, 0x00DF,
+    0x00AE, 0x00A9, 0x2122, 0x00B4, 0x00A8, 0x2260, 0x00C6, 0x00D8,
+    0x221E, 0x00B1, 0x2264, 0x2265, 0x00A5, 0x00B5, 0x2202, 0x2211,
+    0x220F, 0x03C0, 0x222B, 0x00AA, 0x00BA, 0x03A9, 0x00E6, 0x00F8,
+
+    0x00BF, 0x00A1, 0x00AC, 0x221A, 0x0192, 0x2248, 0x2206, 0x00AB,
+    0x00BB, 0x2026, 0x00A0, 0x00C0, 0x00C3, 0x00D5, 0x0152, 0x0153,
+    0x2013, 0x2014, 0x201C, 0x201D, 0x2018, 0x2019, 0x00F7, 0x25CA,
+    0x00FF, 0x0178, 0x2044, 0x20AC, 0x2039, 0x203A, 0xFB01, 0xFB02,
+
+    0x2021, 0x00B7, 0x201A, 0x201E, 0x2030, 0x00C2, 0x00CA, 0x00C1,
+    0x00CB, 0x00C8, 0x00CD, 0x00CE, 0x00CF, 0x00CC, 0x00D3, 0x00D4,
+    0xF8FF, 0x00D2, 0x00DA, 0x00DB, 0x00D9, 0x0131, 0x02C6, 0x02DC,
+    0x00AF, 0x02D8, 0x02D9, 0x02DA, 0x00B8, 0x02DD, 0x02DB, 0x02C7
+  };
+  // TODO: Add MacExpert encoding...
+
+
+  // Initialize the encoding to be the "standard" WinAnsi...
+  for (i = 0; i < 128; i ++)
+    encoding[i] = i;
+  for (i = 160; i < 256; i ++)
+    encoding[i] = i;
+  memcpy(encoding + 128, win_ansi, sizeof(win_ansi));
+
+  // Find the named font...
+  if ((page_dict = pdfioObjGetDict(page_obj)) == NULL)
+    return;
+
+  if ((resources_dict = pdfioDictGetDict(page_dict, "Resources")) == NULL)
+    return;
+
+  if ((font_dict = pdfioDictGetDict(resources_dict, "Font")) == NULL)
+  {
+    // Font resources not a dictionary, see if it is an object...
+    if ((font_obj = pdfioDictGetObj(resources_dict, "Font")) != NULL)
+      font_dict = pdfioObjGetDict(font_obj);
+
+    if (!font_dict)
+      return;
+  }
+
+  if ((font_obj = pdfioDictGetObj(font_dict, name)) == NULL)
+    return;
+
+  if ((encoding_obj = pdfioDictGetObj(pdfioObjGetDict(font_obj), "Encoding")) == NULL)
+    return;
+
+  if ((encoding_dict = pdfioObjGetDict(encoding_obj)) == NULL)
+    return;
+
+  // OK, have the encoding object, build the encoding using it...
+  base_encoding = pdfioDictGetName(encoding_dict, "BaseEncoding");
+  differences   = pdfioDictGetArray(encoding_dict, "Differences");
+
+  if (base_encoding && !strcmp(base_encoding, "MacRomanEncoding"))
+  {
+    // Map upper 128
+    memcpy(encoding + 128, mac_roman, sizeof(mac_roman));
+  }
+
+  if (differences)
+  {
+    // Apply differences
+    size_t	count = pdfioArrayGetSize(differences);
+					// Number of differences
+    const char	*name;			// Character name
+    size_t	idx = 0;		// Index in encoding array
+
+    for (i = 0; i < count; i ++)
+    {
+      switch (pdfioArrayGetType(differences, i))
+      {
+        case PDFIO_VALTYPE_NUMBER :
+            // Get the index of the next character...
+            idx = (size_t)pdfioArrayGetNumber(differences, i);
+            break;
+
+        case PDFIO_VALTYPE_NAME :
+            // Lookup name and apply to encoding...
+            if (idx < 0 || idx > 255)
+              break;
+
+            name = pdfioArrayGetName(differences, i);
+            for (j = 0; j < (sizeof(unicode_map) / sizeof(unicode_map[0])); j ++)
+            {
+              if (!strcmp(name, unicode_map[j].name))
+              {
+                encoding[idx] = unicode_map[j].unicode;
+                break;
+              }
+            }
+	    idx ++;
+            break;
+
+        default :
+            // Do nothing for other values
+            break;
+      }
+    }
+  }
+}
+
+// ----------------------------------------------------------------------
+// NEW CAIRO TEXT IMPLEMENTATION
+// ----------------------------------------------------------------------
+
+void 
+device_begin_text(p2c_device_t *dev) 
+{
+  if (g_verbose) printf("DEBUG: Begin Text\n");
+  cairo_matrix_init_identity(&dev->gstack[dev->gstack_ptr].text_matrix);
+  cairo_matrix_init_identity(&dev->gstack[dev->gstack_ptr].text_line_matrix);
+}
+
+void 
+device_end_text(p2c_device_t *dev) {}
+
+void 
+device_set_text_leading(p2c_device_t *dev, 
+		      	double leading) 
+{
+  dev->gstack[dev->gstack_ptr].text_leading = leading;
+}
+
+void 
+device_move_text_cursor(p2c_device_t *dev, 
+		   	double tx, double ty) 
+{
+  graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
+  cairo_matrix_t trans;
+  cairo_matrix_init_translate(&trans, tx, ty);
+  cairo_matrix_multiply(&gs->text_line_matrix, &trans, &gs->text_line_matrix);
+  gs->text_matrix = gs->text_line_matrix;
+}
+
+void 
+device_next_line(p2c_device_t *dev) 
+{
+  graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
+  device_move_text_cursor(dev, 0, -gs->text_leading);
+}
+
+void 
+device_set_text_matrix(p2c_device_t *dev, 
+		       double a, double b, 
+		       double c, double d, 
+		       double e, double f) 
+{
+  graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
+  cairo_matrix_init(&gs->text_matrix, a, b, c, d, e, f);
+  gs->text_line_matrix = gs->text_matrix;
+}
+
+void 
+device_set_font(p2c_device_t *dev, 
+		const char *font_name, 
+		double font_size) 
+{
+  graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
+
+  // Map PDF font names to standard Cairo families (using strings)
+  const char *family = "Sans";
+  cairo_font_slant_t slant = CAIRO_FONT_SLANT_NORMAL;
+  cairo_font_weight_t weight = CAIRO_FONT_WEIGHT_NORMAL;
+
+  // Simple heuristic to pick the font family
+  if (strstr(font_name, "Times") || strstr(font_name, "Serif") || strstr(font_name, "Roman")) {
+      family = "Serif";
+  } 
+  else if (strstr(font_name, "Courier") || strstr(font_name, "Mono") || strstr(font_name, "Typewriter")) {
+    family = "Monospace";
+  }
+
+  if (strstr(font_name, "Bold")) 
+    weight = CAIRO_FONT_WEIGHT_BOLD;
+  if (strstr(font_name, "Italic") || strstr(font_name, "Oblique")) 
+    slant = CAIRO_FONT_SLANT_ITALIC;
+
+  // Select the font using strings
+  cairo_select_font_face(dev->cr, family, slant, weight);
+  cairo_set_font_size(dev->cr, font_size);
+  gs->font_size = font_size;
+
+  // Load Encoding using the function from pdf2text.c
+  // We pass dev->page because pdf2text's load_encoding expects a page object to find resources.
+  load_encoding(dev->page, font_name, gs->encoding);
+}
+
+static void 
+utf8_encode(int unicode, 
+	    char *out, 
+	    int *len) 
+{
+  if (unicode < 0x80) 
+  { 
+    *len=1; 
+    out[0]=unicode; 
+  }
+  else if (unicode < 0x800) 
+  { 
+    *len=2;
+    out[0]=0xC0|(unicode>>6); 
+    out[1]=0x80|(unicode&0x3F); 
+  }
+  else 
+  { 
+    *len=3; 
+    out[0]=0xE0|(unicode>>12); 
+    out[1]=0x80|((unicode>>6)&0x3F); 
+    out[2]=0x80|(unicode&0x3F); 
+  }
+  out[*len] = 0;
+}
+
+void 
+device_show_text(p2c_device_t *dev, 
+		 const char *str) 
+{
+  graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
+
+  cairo_save(dev->cr);
+
+  // Get Text Matrix and Flip Y for upright text
+  cairo_matrix_t tm = gs->text_matrix;
+  cairo_matrix_scale(&tm, 1.0, -1.0); // Flip Y because Cairo is Top-Down but we set CTM to Bottom-Up
+  cairo_transform(dev->cr, &tm);
+
+  // Decode String to UTF-8 using the encoding table
+  char *utf8_str = malloc(strlen(str) * 4 + 1);
+  char *p = utf8_str;
+  for (int i = 0; str[i]; i++) 
+  {
+    int code = (unsigned char)str[i];
+    int unicode = gs->encoding[code];
+    int len;
+    utf8_encode(unicode, p, &len);
+    p += len;
+  }
+  *p = 0;
+
+  // Draw
+  cairo_set_source_rgb(dev->cr, gs->fill_rgb[0], gs->fill_rgb[1], gs->fill_rgb[2]);
+  cairo_show_text(dev->cr, utf8_str);
+
+  // Advance
+  cairo_text_extents_t extents;
+  cairo_text_extents(dev->cr, utf8_str, &extents);
+
+  cairo_restore(dev->cr);
+
+  // Advance internal matrix (unflipped)
+  cairo_matrix_translate(&dev->gstack[dev->gstack_ptr].text_matrix, extents.x_advance, 0);
+
+  free(utf8_str);
+}
+
+void 
+device_show_text_kerning(p2c_device_t *dev, 
+		    	 operand_t *operands, 
+			 int num_operands) 
+{
+  graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
+  for (int i=0; i<num_operands; i++) 
+  {
+    if (operands[i].type == OP_TYPE_STRING) 
+    {
+      device_show_text(dev, operands[i].value.string);
+    } 
+    else if (operands[i].type == OP_TYPE_NUMBER) 
+    {
+      double adj = -operands[i].value.number / 1000.0 * gs->font_size;
+      cairo_matrix_translate(&dev->gstack[dev->gstack_ptr].text_matrix, adj, 0);
+    }
+  }
+}
+
+void 
+device_set_text_rendering_mode(p2c_device_t *dev, 
+			       int mode) 
+{
+  dev->gstack[dev->gstack_ptr].text_rendering_mode = mode;
+}
+
+
+// _____________________________________
+//OLD IMPLEMENTATION FOR TEXTS(WILL DELETE SOON)
+//________________________________
+/*
 // --- Text State ---
 
 //
@@ -1715,3 +2039,4 @@ device_set_text_rendering_mode(p2c_device_t *dev, 	// I - Active Rendering Conte
     dev->gstack[dev->gstack_ptr].text_rendering_mode = mode;
   }
 }
+*/

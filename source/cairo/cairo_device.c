@@ -41,20 +41,21 @@ device_create(pdfio_rect_t mediabox, 	// I - physical dimensions(co-ords) of PDF
 
   // Create the underlying Cairo image surface and context
   dev->surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, (int)width, (int)height);
+  if (cairo_surface_status(dev->surface) != CAIRO_STATUS_SUCCESS)
+  {
+    free(dev);
+    return NULL;
+  }
+
   dev->cr = cairo_create(dev->surface);
 
-  // Transform coordinates: Apply DPI scale and flip Y-axis to match PDF origin
+  // Scale Cairo so 1 user unit = 1 PDF point (handled by scaling matrix)
   cairo_scale(dev->cr, scale, scale);
-  cairo_translate(dev->cr, 0, mediabox.y2 - mediabox.y1); // Move to bottom-left
-  cairo_scale(dev->cr, 1.0, -1.0); // Flip Y so (+Y) is "up" as per PDF spec
-  
-  // Initialize the FreeType library for font rendering
-  if (FT_Init_FreeType(&dev->ft_library)) 
-  {
-    fprintf (stderr, "ERROR: Could not initialize FreeType library. \n");
-    free(dev);
-    return (NULL);
-  }
+
+  // Flip Y axis (PDF 0,0 is bottom-left, Cairo is top-left)
+  cairo_translate(dev->cr, 0, mediabox.y2 - mediabox.y1); 
+  cairo_scale(dev->cr, 1.0, -1.0); 
+
 
   // Define and set the default initial graphics state
   dev->gstack[0] = (graphics_state_t)
@@ -74,7 +75,10 @@ device_create(pdfio_rect_t mediabox, 	// I - physical dimensions(co-ords) of PDF
   cairo_matrix_init_identity(&dev->gstack[0].text_matrix);
   cairo_matrix_init_identity(&dev->gstack[0].text_line_matrix);
   dev->gstack_ptr = 0;
-  dev->font_cache = NULL;
+
+  // Initialize default encoding (WinAnsi fallback) to identity
+  for (int i=0; i<256; i++) 
+    dev->gstack[0].encoding[i] = i;
 
   // Prepare the surface with a default white background
   cairo_set_source_rgb(dev->cr, 1.0, 1.0, 1.0);
@@ -94,21 +98,6 @@ device_destroy(p2c_device_t *dev)	// I - pointer to structure to be freed
   {
     if (g_verbose)
       printf("DEBUG: Destroying Cairo device.\n");
-
-    // Clean up the font cache: Iterate through the linked list
-    font_cache_entry_t *current = dev->font_cache;
-    font_cache_entry_t *next;
-    while (current)
-    {
-      next = current->next;
-      cairo_font_face_destroy(current->cairo_face); // Release the cached font face
-      free(current);                               // Free the cache entry struct
-      current = next;
-    }
-
-    // Shut down the FreeType library instance if it was initialized
-    if (dev->ft_library)
-      FT_Done_FreeType(dev->ft_library);
 
     // Destroy the Cairo context and the image surface
     cairo_destroy(dev->cr);

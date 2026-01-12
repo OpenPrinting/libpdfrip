@@ -14,8 +14,8 @@ LDFLAGS  =
 PDFIO_CFLAGS   = $(shell pkg-config --cflags pdfio)
 PDFIO_LIBS     = $(shell pkg-config --libs pdfio)
 
-CAIRO_CFLAGS   = $(shell pkg-config --cflags cairo-ft cairo freetype2)
-CAIRO_LIBS     = $(shell pkg-config --libs cairo-ft cairo freetype2) -lpng16 -lz -lm -lcairo -ljpeg
+CAIRO_CFLAGS   = $(shell pkg-config --cflags cairo-ft cairo)
+CAIRO_LIBS     = $(shell pkg-config --libs cairo-ft cairo) -lpng16 -lz -lm -lcairo -ljpeg
 
 # --- Final Build Flags ---
 BUILD_CFLAGS = $(CFLAGS) $(PDFIO_CFLAGS) $(CAIRO_CFLAGS)
