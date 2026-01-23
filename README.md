@@ -126,23 +126,23 @@ Analyze page 2 content stream:
 ./pdf2cairo/pdf2cairo_main --analyze -p 2 document.pdf
 ```
 
-## Testing
+## Verifying Your Build
 
-```
-make test
+This project doesn't have automated tests yet. To verify your build works, try rendering a sample PDF:
+
+```bash
+./pdf2cairo/pdf2cairo_main -o test-output.png testfiles/renderer/sample.pdf
 ```
 
-Test output images are written to:
+If it generates a PNG without crashing, you're good to go. You can also use the `--analyze` flag to inspect the PDF structure without rendering.
 
-```
-testfiles/renderer-output/
-```
+We'd love help adding a proper test suite! If you're interested, check the Contributing section below.
 
 ---
 
 ## Understanding PDFs (For Beginners)
 
-If you're new to PDF internals, here's what you need to know to work on this project.
+If you're new to PDF internals, here's some background that will help you understand the codebase and contribute effectively.
 
 ### PDFs Are Programs, Not Documents
 
@@ -333,9 +333,9 @@ We welcome contributions! This project is a great way to learn about PDF interna
    ```bash
    make
    ```
-5. **Run the tests** to make sure everything works:
+5. **Verify it works** by rendering a test PDF:
    ```bash
-   make test
+   ./pdf2cairo/pdf2cairo_main -o test.png testfiles/renderer/sample.pdf
    ```
 
 ### Making Changes
@@ -345,11 +345,11 @@ We welcome contributions! This project is a great way to learn about PDF interna
    git checkout -b fix-text-rendering
    ```
 2. **Make your changes** - Start small! Fix one bug or add one small feature.
-3. **Test your changes**:
+3. **Rebuild and verify your changes**:
    ```bash
    make clean
    make
-   make test
+   ./pdf2cairo/pdf2cairo_main -o test.png testfiles/renderer/sample.pdf
    ```
 4. **Commit your changes**:
    ```bash
@@ -365,16 +365,19 @@ We welcome contributions! This project is a great way to learn about PDF interna
 ### What Makes a Good Contribution?
 
 - **Small and focused** - Fix one thing at a time
-- **Well-tested** - Make sure existing tests pass and add new tests if needed
+- **Verified** - Make sure your changes work on at least one test PDF before submitting
 - **Explained** - Your commit message should explain what you changed and why
 - **Follows existing code style** - Look at the surrounding code and match it
 
 Don't worry about making your first contribution perfect. We'd rather see a small, imperfect fix than wait for a massive perfect rewrite.
 
+**Note**: We don't have automated tests yet, so manual testing is important. If you break something, we'll catch it during review - no big deal.
+
 ### Areas Where We Need Help
 
+- **Automated testing** - We need a proper test suite! This is a great first contribution
 - **Bug fixes** - Especially rendering issues with specific PDFs
-- **Test coverage** - More test PDFs and test cases
+- **Test PDFs** - More sample PDFs that exercise different features
 - **Documentation** - Explaining PDF operators and rendering concepts
 - **Performance** - Optimizing hot paths in the renderer
 - **New operators** - Implementing PDF operators we don't support yet
@@ -391,10 +394,12 @@ We're here to help. Everyone starts somewhere, and PDF is genuinely complicated.
 
 ---
 
-## Contributing
+## License and Additional Info
 
-Contributions are welcomed. All pull requests must:
+Contributions are welcomed. All pull requests should:
 
-* Pass the existing test suite (`make test`).
-* Follow the current code structure and formatting conventions.
+* Follow the current code structure and formatting conventions
+* Be manually verified on at least one test PDF
+* Include a clear explanation of what changed and why
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for more details on the contribution process.
