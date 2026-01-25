@@ -13,12 +13,14 @@ The following tools and libraries are required to build libpdfrip:
 * C compiler (gcc or clang)
 * make
 * pkg-config
-* PDFio library and development headers
-* Cairo library and development headers
-* FreeType2 library and development headers
-* libpng library and development headers
+* PDFio
+* Cairo
+* FreeType2
+* libpng
 
-On Debian and Ubuntu systems, install the required packages with:
+### Installing tools on Debian/Ubuntu
+
+Install the required packages with:
 
 ```bash
 sudo apt-get install build-essential pkg-config libpdfio-dev libcairo2-dev libfreetype6-dev libpng-dev

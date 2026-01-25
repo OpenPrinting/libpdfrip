@@ -1,30 +1,36 @@
-# Understanding PDFs (For Beginners)
+# Understanding PDFs (For Contributors)
 
-If you're new to PDF internals, here's some background that will help you understand the codebase and contribute effectively.
+This document provides background information on PDF internals relevant to understanding and contributing to the libpdfrip codebase. It focuses on the practical structure of PDF files as encountered by a PDF renderer, rather than on exhaustive coverage of the PDF specification.
 
-This document is intentionally informal and focuses on practical understanding rather than strict PDF specification details.
+---
 
-## PDFs Are Programs, Not Documents
+## PDFs as Instruction Streams
 
-This is the biggest mind shift: a PDF isn't really a "document" in the way a text file is. It's more like a program that tells a renderer what to draw.
+A PDF file is not a static document format. Instead, it consists of a sequence of drawing instructions that are interpreted by a rendering engine to produce visual output. These instructions operate on a graphics state and are executed sequentially.
 
-When you open a PDF, the viewer executes drawing commands like:
-- "Move to coordinate (100, 200)"
-- "Draw a line to (150, 300)"
-- "Fill this path with red"
-- "Show the text 'Hello World' at the current position"
+A PDF rendering engine processes commands such as:
+- Moving the current drawing position
+- Constructing vector paths
+- Filling or stroking shapes
+- Placing text or raster images
+
+---
 
 ## Pages
 
-A PDF contains one or more pages. Each page has:
+A PDF document contains one or more pages. Each page consists of the following components:
 
-- **Resources** - Fonts, images, and reusable graphics that the page needs
-- **Content Stream** - A sequence of drawing commands (the "program" that draws the page)
-- **MediaBox** - The physical size of the page (like 8.5" × 11")
+- **Resources**: A collection of fonts, images, and reusable objects required by the page.
+- **Content Stream**: A stream of PDF operators that describe how the page is rendered.
+- **MediaBox**: The physical dimensions of the page in user space coordinates.
+
+---
 
 ## Content Streams
 
-The content stream is where the action happens. It's a list of PDF operators like:
+The content stream contains the primary drawing commands for a page. It is a sequence of PDF operators and operands that modify the graphics state and generate output.
+
+Example content stream:
 
 ```
 10 20 m          % Move to (10, 20)
@@ -35,86 +41,86 @@ h                % Close path
 S                % Stroke (draw the outline)
 ```
 
-Our interpreter reads these commands one by one and tells Cairo what to draw.
-
-## XObjects (External Objects)
-
-XObjects are reusable content. Instead of repeating the same drawing commands over and over, you define an XObject once and reference it multiple times.
-
-There are two main types:
-- **Image XObjects** - Embedded images (JPEG, PNG, etc.)
-- **Form XObjects** - Reusable vector graphics and text (not interactive forms!)
-
-Think of Form XObjects like functions in C - you define them once and call them whenever needed.
+The interpreter processes these operators sequentially and issues corresponding drawing commands to the underlying graphics library (Cairo in the case of libpdfrip).
 
 ---
 
-## Form XObjects - A Deep Dive
+## XObjects (External Objects)
 
-Form XObjects are everywhere in real PDFs. If you're going to work on this project, you need to understand them.
+XObjects are reusable content objects that can be referenced multiple times within a PDF document. This mechanism avoids duplication of drawing commands and reduces file size.
 
-You don't need to understand every detail here to start contributing.
-This section is meant as background for when you encounter Form XObjects in the code.
+There are two primary types of XObjects:
 
-### What Is a Form XObject?
+- **Image XObjects**: Embedded raster images (JPEG, PNG, etc.)
+- **Form XObjects**: Reusable vector graphics and text content
 
-A Form XObject is a **self-contained chunk of PDF content** that you can reuse. It's like copying a bunch of drawing commands into a function, then calling that function whenever you want to draw that content.
+Form XObjects function analogously to subroutines in procedural programming—they are defined once and invoked as needed.
 
-**Real-world example**: A company logo that appears on every page. Instead of including the logo's drawing commands 50 times (once per page), you define it as a Form XObject and reference it 50 times. The PDF is smaller, and rendering can be faster (because the renderer can cache the result).
+---
 
-### Anatomy of a Form XObject
+## Form XObjects: Detailed Specification
 
-A Form XObject is a PDF stream with these key entries:
+Form XObjects are prevalent in production PDF files. A thorough understanding of Form XObjects is essential for working with the libpdfrip interpreter.
+
+### Definition
+
+A Form XObject is a self-contained stream of PDF content that can be referenced and rendered multiple times. It encapsulates drawing commands along with the necessary resources (fonts, images, etc.) and transformation parameters.
+
+Example use case: A company logo appearing on every page of a document. Rather than embedding the logo's drawing commands on each page, the logo is defined once as a Form XObject and referenced multiple times. This approach reduces file size and may improve rendering performance through caching.
+
+### Structure of a Form XObject
+
+A Form XObject is a PDF stream object with a dictionary containing the following key entries:
 
 ```
 <<
   /Type /XObject
-  /Subtype /Form        % "I'm a Form, not an Image"
-  /BBox [0 0 100 50]    % My coordinate space
-  /Matrix [1 0 0 1 0 0] % How to transform me
-  /Resources << ... >>  % Fonts, images I need
+  /Subtype /Form        % Identifies this as a Form XObject
+  /BBox [0 0 100 50]    % Bounding box defining coordinate space
+  /Matrix [1 0 0 1 0 0] % Transformation matrix
+  /Resources << ... >>  % Resource dictionary
 >>
 stream
-% Drawing commands go here (just like a page content stream)
-1 0 0 rg               % Set color to red
-0 0 100 50 re          % Rectangle from (0,0) to (100,50)
-f                      % Fill it
+% Drawing commands (identical in structure to page content streams)
+1 0 0 rg               % Set fill color to red
+0 0 100 50 re          % Define rectangle from (0,0) to (100,50)
+f                      % Fill the rectangle
 endstream
 ```
 
 ### Key Dictionary Entries
 
-#### /Subtype /Form
+#### /Subtype
 
-This says "I'm a Form XObject, not an Image XObject." When you see `/Type /XObject`, you need to check the Subtype to know what you're dealing with.
+The `/Subtype` entry specifies the XObject type. The value `/Form` indicates a Form XObject, as distinct from `/Image` for Image XObjects. This entry is mandatory for distinguishing between XObject types.
 
 #### /BBox (Bounding Box)
 
-`/BBox [x_min y_min x_max y_max]`
+Syntax: `/BBox [x_min y_min x_max y_max]`
 
-This defines the Form's **own coordinate system**. Everything drawn inside the Form uses these coordinates.
+The bounding box defines the coordinate system for the Form XObject's content. All drawing operations within the Form are interpreted relative to this coordinate space.
 
-Example: `/BBox [0 0 200 100]` means the Form has a coordinate space from (0, 0) to (200, 100).
+Example: `/BBox [0 0 200 100]` establishes a coordinate space extending from (0, 0) to (200, 100).
 
 #### /Matrix (Transformation Matrix)
 
-`/Matrix [a b c d e f]`
+Syntax: `/Matrix [a b c d e f]`
 
-This is a 6-number transformation matrix (like you'd use in linear algebra or OpenGL). It transforms the Form's coordinate space when you place it on a page.
+The transformation matrix is a 6-element array representing a 2D affine transformation. This matrix transforms the Form's coordinate space when the Form is rendered within a page or another Form XObject.
 
-Default: `[1 0 0 1 0 0]` (identity matrix - no transformation)
+Default value: `[1 0 0 1 0 0]` (identity matrix, indicating no transformation)
 
-The matrix handles:
-- **Scaling** - Make the Form bigger or smaller
-- **Rotation** - Rotate the Form
-- **Translation** - Move the Form to a different position
-- **Skewing** - Distort the Form (rarely used)
+The transformation matrix supports the following operations:
+- **Scaling**: Adjusting the size of the Form content
+- **Rotation**: Rotating the Form content
+- **Translation**: Repositioning the Form content
+- **Skewing**: Applying shear transformations (uncommon)
 
-You don't need to understand matrix math to work on this project, but if you're curious, it's a standard 2D affine transformation matrix.
+The matrix represents a standard 2D affine transformation as used in linear algebra and computer graphics.
 
 #### /Resources
 
-Just like a page, a Form XObject can have its own Resources dictionary:
+A Form XObject may include its own Resources dictionary, similar to a page:
 
 ```
 /Resources <<
@@ -123,56 +129,59 @@ Just like a page, a Form XObject can have its own Resources dictionary:
 >>
 ```
 
-This tells the Form what fonts, images, or even other Form XObjects it needs.
+This dictionary specifies the fonts, images, and nested Form XObjects required by the Form's content stream.
 
-### The Do Operator - Invoking a Form
+### The Do Operator: Invoking a Form XObject
 
-To use a Form XObject, you reference it in your Resources and then use the `Do` operator:
+A Form XObject is invoked using the `Do` operator. The Form must first be registered in the current Resources dictionary:
 
 ```
-% In the page's Resources:
+% Page's Resources dictionary:
 /Resources <<
-  /XObject << /Logo 42 0 R >>  % "Logo" points to a Form XObject
+  /XObject << /Logo 42 0 R >>  % "Logo" references a Form XObject
 >>
 
-% In the page's content stream:
+% Page's content stream:
 q                   % Save graphics state
-1 0 0 1 100 200 cm  % Move to position (100, 200)
-/Logo Do            % Execute the Form XObject named "Logo"
+1 0 0 1 100 200 cm  % Apply transformation (translate to 100, 200)
+/Logo Do            % Invoke the Form XObject named "Logo"
 Q                   % Restore graphics state
 ```
 
-When the renderer encounters `Do`:
+When the renderer encounters a `Do` operator, it performs the following sequence:
 
-1. **Save the current state** (like pushing a stack frame)
-2. **Apply the Form's /Matrix transformation**
-3. **Set up the Form's resources** (fonts, images, etc.)
-4. **Execute the Form's content stream** (process all its drawing commands)
-5. **Restore the previous state** (pop the stack)
+1. **Save the current graphics state**: Preserves the state prior to executing the Form.
+2. **Apply the Form's `/Matrix` transformation**: Transforms the coordinate space according to the Form's matrix.
+3. **Activate the Form's `/Resources`**: Makes the Form's resources available during execution.
+4. **Execute the Form's content stream**: Processes the drawing operators contained in the Form.
+5. **Restore the previous graphics state**: Returns to the saved state.
 
-It's almost exactly like calling a function in C, except the "function body" is a stream of PDF operators.
+This sequence is analogous to a function call in procedural programming, where the content stream serves as the function body.
 
-### Why Form XObjects Matter
+### Common Use Cases for Form XObjects
 
-You'll encounter Form XObjects constantly:
+Form XObjects are used in the following scenarios:
 
-- **Repeated content** - Headers, footers, logos, watermarks
-- **File size optimization** - Complex graphics stored once, referenced many times
-- **PDF forms** - Yes, confusingly, interactive PDF form fields often use Form XObjects to draw buttons, checkboxes, etc.
-- **Layers and structure** - Some PDFs use Form XObjects to organize content logically
+- **Repeated content**: Headers, footers, logos, watermarks
+- **File size optimization**: Complex graphics defined once and referenced multiple times
+- **Interactive PDF forms**: Form field appearances (buttons, checkboxes, text fields) are often implemented using Form XObjects
+- **Content organization**: Logical structuring of content, including optional content groups (layers)
 
-If your PDF renderer doesn't handle Form XObjects, you'll fail on the vast majority of real-world PDFs.
+Support for Form XObjects is essential for correctly rendering the majority of real-world PDF documents.
 
-### In the libpdfrip Code
+---
 
-When you're working on the interpreter, you'll see code that:
+## Form XObject Handling in libpdfrip
 
-1. Detects the `Do` operator
-2. Looks up the XObject name in the current Resources
-3. Checks if it's a Form (as opposed to an Image)
-4. Saves the graphics state
-5. Applies the Form's Matrix
-6. Recursively processes the Form's content stream
-7. Restores the graphics state
+The libpdfrip interpreter implements Form XObject support through the following mechanism:
 
-This recursive processing is why PDF rendering can be tricky - Forms can contain Forms can contain Forms...
+1. **Detection**: The interpreter identifies the `Do` operator in the content stream.
+2. **Resolution**: The XObject name is resolved by looking up the name in the current Resources dictionary.
+3. **Type checking**: The interpreter verifies that the XObject is a Form (as opposed to an Image).
+4. **State management**: The current graphics state is saved.
+5. **Transformation**: The Form's `/Matrix` is applied to the graphics state.
+6. **Recursive execution**: The Form's content stream is processed recursively by the interpreter.
+7. **State restoration**: The saved graphics state is restored.
+
+This recursive processing model supports arbitrary nesting of Form XObjects within other Form XObjects. Proper state management is critical to correct rendering, as Form XObjects may modify the graphics state in ways that must not persist after the Form completes execution.
+
