@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "test.h"  // testBegin and testEnd functions come from here
+#include <dirent.h>
 
 // Structure to hold a single renderer test case
 typedef struct
@@ -18,46 +19,49 @@ typedef struct
 } renderer_test_t;
 
 // Common paths for test files
-static const char *input_path = "testfiles/renderer/";
+static const char *input_path = "testfiles/input/basic/";
 static const char *output_path = "testfiles/renderer-output/";
 
-// Array of renderer test cases
+/* --- ORIGINAL MANUAL TEST ARRAY (Commented Out) ---
+ * Use this structure if you want to define specific flags or
+ * output names for individual files.
+ *
 static renderer_test_t tests[] = 
 {
-  { "Stroked box", "01_stroked_box.pdf", "", "o", "01.png" },
-  { "Filled RGB box", "02_filled_box_rgb.pdf", "", "T", ""},
-  { "Nested Box", "03_nested_state.pdf", "", "T", ""},
-  { "Cubic_Bezier_Curve", "04_Cubic_Bezier_Curve.pdf", "", "T", ""},
-  { "Curves" , "05_Curves.pdf", "", "T", ""},
-  { "Fill and Stroke", "06_fill_and_stroke.pdf", "", "T", ""},
-  { "Shape with hole", "07_shape_with_holes.pdf", "", "T", ""},
-  { "TestFilledBanners", "TestFilledBanners.pdf", "", "T", ""},
-  { "TestFilledBasicShapesPart1", "TestFilledBasicShapesPart1.pdf", "", "T", ""},
-  { "TestFilledBasicShapesPart2", "TestFilledBasicShapesPart2.pdf", "", "T", ""},
-  { "TestFilledBlockArrows", "TestFilledBlockArrows.pdf", "", "T", ""},
-  { "TestFilledEquationShapes", "TestFilledEquationShapes.pdf", "", "T", ""},
-  { "TestFilledFlowChart", "TestFilledFlowChart.pdf", "", "T", ""},
-  { "TestFilledRectangles", "TestFilledRectangles.pdf", "", "T", ""},
-  { "TestFilledStars", "TestFilledStars.pdf", "", "T", ""},
-  { "TestStrokedBanners", "TestStrokedBanners.pdf", "" , "T", ""},
-  { "TestStrokedBasicShapesPart1", "TestStrokedBasicShapesPart1.pdf", "", "T", ""},
-  { "TestStrokedBasicShapesPart2", "TestStrokedBasicShapesPart2.pdf", "", "T", ""},
-  { "TestStrokedBlockArrows", "TestStrokedBlockArrows.pdf", "", "T", ""},
-  { "TestStrokedEquationShapes", "TestStrokedEquationShapes.pdf", "", "T", ""},
-  { "TestStrokedFlowChart", "TestStrokedFlowChart.pdf", "", "T", ""},
-  { "TestStrokedRectangles", "TestStrokedRectangles.pdf", "", "T", ""},
-  { "TestStrokedStars", "TestStrokedStars.pdf", "", "T", ""},
-  { "TestTables", "TestTables.pdf", "", "T", ""},
-  { "test_file_1pg", "test_file_1pg.pdf", "", "T", ""},
-  { "simpleText", "simpleText.pdf", "-v", "T", ""}
+  { "Stroked box", "basic/01_stroked_box.pdf", "", "T", "" },
+  { "Filled RGB box", "basic/02_filled_box_rgb.pdf", "", "T", ""},
+  { "Nested Box", "basic/03_nested_state.pdf", "", "T", ""},
+  { "Cubic_Bezier_Curve", "basic/04_Cubic_Bezier_Curve.pdf", "", "T", ""},
+  { "Curves" , "basic/05_Curves.pdf", "", "T", ""},
+  { "Fill and Stroke", "basic/06_fill_and_stroke.pdf", "", "T", ""},
+  { "Shape with hole", "basic/07_shape_with_holes.pdf", "", "T", ""},
+  { "TestFilledBanners", "basic/TestFilledBanners.pdf", "", "T", ""},
+  { "TestFilledBasicShapesPart1", "basic/TestFilledBasicShapesPart1.pdf", "", "T", ""},
+  { "TestFilledBasicShapesPart2", "basic/TestFilledBasicShapesPart2.pdf", "", "T", ""},
+  { "TestFilledBlockArrows", "basic/TestFilledBlockArrows.pdf", "", "T", ""},
+  { "TestFilledEquationShapes", "basic/TestFilledEquationShapes.pdf", "", "T", ""},
+  { "TestFilledFlowChart", "basic/TestFilledFlowChart.pdf", "", "T", ""},
+  { "TestFilledRectangles", "basic/TestFilledRectangles.pdf", "", "T", ""},
+  { "TestFilledStars", "basic/TestFilledStars.pdf", "", "T", ""},
+  { "TestStrokedBanners", "basic/TestStrokedBanners.pdf", "" , "T", ""},
+  { "TestStrokedBasicShapesPart1", "basic/TestStrokedBasicShapesPart1.pdf", "", "T", ""},
+  { "TestStrokedBasicShapesPart2", "basic/TestStrokedBasicShapesPart2.pdf", "", "T", ""},
+  { "TestStrokedBlockArrows", "basic/TestStrokedBlockArrows.pdf", "", "T", ""},
+  { "TestStrokedEquationShapes", "basic/TestStrokedEquationShapes.pdf", "", "T", ""},
+  { "TestStrokedFlowChart", "basic/TestStrokedFlowChart.pdf", "", "T", ""},
+  { "TestStrokedRectangles", "basic/TestStrokedRectangles.pdf", "", "T", ""},
+  { "TestStrokedStars", "basic/TestStrokedStars.pdf", "", "T", ""},
+  { "TestTables", "basic/TestTables.pdf", "", "T", ""},
+  { "test_file_1pg", "basic/test_file_1pg.pdf", "", "T", ""},
+  { "simpleText", "basic/simpleText.pdf", "", "T", ""}
 };
+*/
 
 // Main()
 int main(void)
 {
-  int i;
   int status = 0;
-  int num_tests = sizeof(tests) / sizeof(tests[0]);
+  char command[2048];
 
   puts(" --- Running PDF2Cairo Renderer Tests --- ");
 
@@ -69,61 +73,63 @@ int main(void)
     return (1);
   }
   testEnd (true);
-  
-  // Loop through all of the test cases
-  for (i = 0; i < num_tests; i++)
+
+/*   
+ * ____________MANUAL TEST(UNCOMMENT IT FOR TESTING INDIVIDUAL FILES_____
+  int num_manual = sizeof(manual_tests) / sizeof(manual_tests[0]);
+  for (i = 0; i < num_manual; i++)
   {
-    char command[2048]; // Command to execute
+    testBegin(" Manual Test: %s", manual_tests[i].description);
+    
+    // Construct command with specific flags (o, d, or T)
+    snprintf(command, sizeof(command), "./source/tools/pdf2cairo/pdf2cairo %s %s%s",
+             manual_tests[i].input_args, input_path, manual_tests[i].input_file);
 
-    // Format the command that will be run
-    // *** THIS LINE IS UPDATED ***
-    // It now points to the new path in the same directory.
-    snprintf(command, sizeof(command), "./source/tools/pdf2cairo/pdf2cairo %s%s%s%s",
-        tests[i].input_args,
-        (tests[i].input_args[0]!='\0') ? " ": "",
-        input_path,
-        tests[i].input_file);
-
-    // Append output argumetns based on the test case specification
-    if (tests[i].output_option)
-    {
-      if (strcmp(tests[i].output_option, "o") == 0 && tests[i].output_filename)
-      {
-        // -o <path/filename>
-        strncat(command, " -o ", sizeof(command) - strlen(command) - 1);
-        strncat(command, output_path, sizeof(command) - strlen(command) - 1);
-        strncat(command, tests[i].output_filename, sizeof(command) - strlen(command) - 1);
-      }
-      else if (strcmp(tests[i].output_option, "d") == 0)
-      {
-        // -d <path>
-        strncat(command, " -d ", sizeof(command) - strlen(command) - 1);
-        strncat(command, output_path, sizeof(command) - strlen(command) - 1);
-      }
-      else if (strcmp(tests[i].output_option, "T") == 0)
-      {
-        // - T
-        strncat(command, " -T ", sizeof(command) - strlen(command) - 1);
-      }
+    if (strcmp(manual_tests[i].output_option, "o") == 0) {
+      strncat(command, " -o ", sizeof(command) - strlen(command) - 1);
+      strncat(command, output_path, sizeof(command) - strlen(command) - 1);
+      strncat(command, manual_tests[i].output_filename, sizeof(command) - strlen(command) - 1);
+    } else {
+      strncat(command, " -T", sizeof(command) - strlen(command) - 1);
     }
 
-    // Run the test
-    testBegin(" Test: %s", tests[i].description);
-
-    if (system(command) != 0)
-    {
-      // Command failed; 
-      testEnd(false);
-      status = 1;
-    }
-    else 
-    {
-      // Command succeeded
-      testEnd(true);
-    }
+    if (system(command) != 0) status = 1, testEnd(false);
+    else testEnd(true);
   }
+*/
+  
+  // Open directory containing the PDF files
+  DIR *dir = opendir(input_path);
+  struct dirent *entry;
+  if (dir)
+  {
+    while ((entry = readdir(dir)) != NULL) 
+    {
+      if (strstr(entry->d_name, ".pdf")) 
+      {
+        testBegin("Test: %s", entry->d_name);
+        snprintf(command, sizeof(command), "./source/tools/pdf2cairo/pdf2cairo -T %s%s",
+                 input_path, entry->d_name);
 
+        if (system(command) == 0) 
+	{
+	  testEnd(true);
+	}
+        else 
+	{
+          testEnd(false);
+	  status = 1; 
+	}
+      }
+    }
+    closedir(dir);
+  }
+  else
+  {
+    fprintf(stderr, "Could not open directory: %s\n", input_path);
+    return 1;
+  }
+  
   puts(" --- Renderer Test finished. Check files in the testfiles/renderer-output/ --- ");
-
   return (status);
 }

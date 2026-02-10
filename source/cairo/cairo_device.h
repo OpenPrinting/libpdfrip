@@ -1,4 +1,4 @@
-//
+
 // Copyright 2025 Yash Kumar Kasaudhan <vididvidid@gmail.com>
 // Copyright 2025 Uddhav Phatak <uddhavphatak@gmail.com>
 //
@@ -68,5 +68,4 @@ void device_show_text_kerning(p2c_device_t *dev, operand_t  *operands, int num_o
 void device_set_text_rendering_mode(p2c_device_t *dev, int mode);
 void device_set_page(p2c_device_t *dev, pdfio_obj_t *page);
 void device_get_current_point(p2c_device_t *dev, double *x, double *y);
-
 #endif 

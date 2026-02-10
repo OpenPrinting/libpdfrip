@@ -104,7 +104,6 @@ static void
 handle_Tf(p2c_device_t *dev, 
    	  pdfio_dict_t *resources) 
 {
-  printf("\n\n>>>>>>>>>>> TF <<<<<<<<<<<<<\n\n");
   if (operand_stack_ptr == 2 && 
        operand_stack[0].type == OP_TYPE_NAME && 
         operand_stack[1].type == OP_TYPE_NUMBER)

@@ -57,6 +57,10 @@ $(BIN): $(OBJS)
 	@echo "Compiling $<..."
 	$(CC) $(BUILD_CFLAGS) -c -o $@ $<
 
+test: testpdf2cairo.c
+	$(CC) $(BUILD_CFLAGS) testpdf2cairo.c -o testpdf2cairo $(BUILD_LIBS)
+	./testpdf2cairo
+
 clean:
 	@echo "Cleaning build files..."
 	$(RM) $(OBJS) $(BIN)

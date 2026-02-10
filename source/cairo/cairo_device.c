@@ -172,4 +172,3 @@ device_set_page (p2c_device_t *dev, 	// I - Active Rendering Context
   // Store the pointer to the PDF page object in the device structure
   dev->page = page;
 }
-

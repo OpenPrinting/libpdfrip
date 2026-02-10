@@ -1,5 +1,8 @@
 *.o
+*.swp
+a.out
 pdf2cairo/*.o
 testpdf2cairo
-pdf2cairo/pdf2cairo_main
 testfiles/renderer-output/
+testfiles/testpdfio
+source/tools/pdf2cairo/pdf2cairo
