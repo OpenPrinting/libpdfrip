@@ -166,8 +166,8 @@ device_save_to_png(p2c_device_t *dev, 		// I - Active Rendering context
 //
 
 void 					  // O - Void
-device_set_page (p2c_device_t *dev, 	// I - Active Rendering Context
-	 	 pdfio_obj_t *page)	// I - Page object currently being renderered
+device_set_page(p2c_device_t *dev, 	// I - Active Rendering Context
+	 	pdfio_obj_t *page)	// I - Page object currently being renderered
 {
   // Store the pointer to the PDF page object in the device structure
   dev->page = page;

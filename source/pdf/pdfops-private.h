@@ -40,4 +40,7 @@ typedef struct pdfrip_page_s
 
 pdfrip_page_t* getPageData(pdfio_file_t *pdf, size_t page_number); // get Page Data from PDF
 void freePageData(pdfrip_page_t *page);
+
+// Text helper functions
+void load_encoding(pdfio_obj_t *page_obj, const char *name, int encoding[256]);
 #endif

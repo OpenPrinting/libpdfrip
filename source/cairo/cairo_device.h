@@ -1,6 +1,6 @@
 
 // Copyright 2025 Yash Kumar Kasaudhan <vididvidid@gmail.com>
-// Copyright 2025 Uddhav Phatak <uddhavphatak@gmail.com>
+// Copyright 2025-2026 Uddhav Phatak <uddhavphatak@gmail.com>
 //
 // Licensed under Apache License v2.0.  See the file "LICENSE" for more
 // information.
@@ -12,7 +12,7 @@
 
 #include <cairo/cairo.h>
 #include <pdfio.h>
-#include "interpreter.h"
+#include "../pdf/parser.h"
 #include <ft2build.h>
 
 typedef struct cairo_device_s p2c_device_t;

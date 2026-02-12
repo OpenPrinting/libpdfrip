@@ -12,7 +12,7 @@
 #include <unistd.h>
 
 #include "pdfops-private.h"
-#include "../pdf/interpreter.h"
+#include "../pdf/parser.h"
 #include "../cairo/cairo_device.h"
 
 int g_verbose = 0;
@@ -26,7 +26,6 @@ print_usage(const char *prog_name) // I - Program name
 {
   fprintf(stderr, "Usage: %s [options] input.pdf\n", prog_name);
   fprintf(stderr, "\nOptions:\n");
-  fprintf(stderr, "  --analyze              Analyze the PDF content stream instead of rendering.\n");
   fprintf(stderr, "  --help                 Display this help message and exit.\n");
   fprintf(stderr, "  -o <output.png>        Specify the output PNG filename (render mode).\n");
   fprintf(stderr, "  -p <pagenum>           Specify the page number to process (default: 1).\n");

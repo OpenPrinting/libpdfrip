@@ -16,7 +16,8 @@
 typedef struct cairo_device_s p2c_device_t;
 
 // Defines the types of operands that can be on the stack
-typedef enum {
+typedef enum operand_type_s
+{
   OP_TYPE_NONE,
   OP_TYPE_NUMBER,
   OP_TYPE_NAME,
@@ -24,9 +25,11 @@ typedef enum {
 } operand_type_t;
 
 // Defines a single generic operand on the stack
-typedef struct {
+typedef struct operand_s
+{
   operand_type_t type;
-  union {
+  union 
+  {
     double number;
     char name[1024];
     char string[1024];

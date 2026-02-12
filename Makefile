@@ -6,7 +6,7 @@ RM = rm -f
 # -I adds directories to the include path so the compiler can find headers
 # source/pdf             -> for pdfops-private.h
 # source/cairo           -> for cairo_device.h
-# source/tools/pdf2cairo -> for interpreter.h
+# source/tools/pdf2cairo -> for parser.h
 CFLAGS   = -g -Wall -Isource/pdf -Isource/cairo -Isource/tools/pdf2cairo
 LDFLAGS  =
 
@@ -33,7 +33,8 @@ SRCS_CAIRO = source/cairo/cairo_device.c \
 
 # 3. The PDF Operations (in source/pdf)
 SRCS_PDF   = source/pdf/pdfops.c \
-             source/pdf/interpreter.c
+             source/pdf/parser.c \
+	     source/pdf/pdf-text.c
 
 # Combine all sources
 SRCS = $(SRCS_TOOL) $(SRCS_CAIRO) $(SRCS_PDF)

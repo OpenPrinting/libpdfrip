@@ -6,8 +6,7 @@
 // information.
 //
 
-
-#include "interpreter.h"
+#include "parser.h"
 #include "cairo_device.h"
 #include <ctype.h>
 #include <stdio.h>
@@ -30,7 +29,8 @@ static void
 handle_q(p2c_device_t *dev, 
 	 pdfio_dict_t *resources) 
 {
-  if (g_verbose) printf("DEBUG: Operator q (Save State)\n");
+  if (g_verbose) 
+    fprintf(stderr, "DEBUG: Operator q (Save State)\n");
   device_save_state(dev);
 }
 
@@ -38,7 +38,8 @@ static void
 handle_Q(p2c_device_t *dev, 
 	 pdfio_dict_t *resources) 
 {
-  if (g_verbose) printf("DEBUG: Operator Q (Restore State)\n");
+  if (g_verbose) 
+    fprintf(stderr, "DEBUG: Operator Q (Restore State)\n");
   device_restore_state(dev);
 }
 
@@ -64,8 +65,13 @@ handle_Td(p2c_device_t *dev,
        operand_stack[0].type == OP_TYPE_NUMBER && 
         operand_stack[1].type == OP_TYPE_NUMBER) 
   {
-    if (g_verbose) printf("DEBUG: Operator Td (Move Text) with args (%f, %f)\n", operand_stack[0].value.number, operand_stack[1].value.number);
-    device_move_text_cursor(dev, operand_stack[0].value.number, operand_stack[1].value.number);
+    if (g_verbose) 
+      fprintf(stderr, "DEBUG: Operator Td (Move Text) with args (%f, %f)\n", 
+	      	       operand_stack[0].value.number, 
+		       operand_stack[1].value.number);
+
+    device_move_text_cursor(dev, operand_stack[0].value.number, 
+		          	 operand_stack[1].value.number);
   }
 }
 
@@ -77,9 +83,12 @@ handle_TD(p2c_device_t *dev,
        operand_stack[0].type == OP_TYPE_NUMBER && 
         operand_stack[1].type == OP_TYPE_NUMBER) 
   {
-    if (g_verbose) printf("DEBUG: Operator TD (Move text and Set Leading) with args (%f, %f)\n", operand_stack[0].value.number, operand_stack[1].value.number);
+    if (g_verbose) 
+      fprintf(stderr, "DEBUG: Operator TD (Move text and Set Leading) with args (%f,%f)\n", 			  operand_stack[0].value.number, 
+		       operand_stack[1].value.number);
     device_set_text_leading(dev, -operand_stack[1].value.number);
-    device_move_text_cursor(dev, operand_stack[0].value.number, operand_stack[1].value.number);
+    device_move_text_cursor(dev, operand_stack[0].value.number, 
+		    		 operand_stack[1].value.number);
   }
 }
 
@@ -87,7 +96,8 @@ static void
 handle_T_star(p2c_device_t *dev, 
 	      pdfio_dict_t *resources) 
 {
-  if (g_verbose) printf("DEBUG: Operator T* (Next Line)\n");
+  if (g_verbose) 
+    fprintf(stderr, "DEBUG: Operator T* (Next Line)\n");
   device_next_line(dev);
 }
 
@@ -95,8 +105,14 @@ static void
 handle_Tm(p2c_device_t *dev, 
 	  pdfio_dict_t *resources) 
 {
-  if (operand_stack_ptr == 6) { // Assume all are numbers for brevity
-    device_set_text_matrix(dev, operand_stack[0].value.number, operand_stack[1].value.number, operand_stack[2].value.number, operand_stack[3].value.number, operand_stack[4].value.number, operand_stack[5].value.number);
+  if (operand_stack_ptr == 6)  // Assume all are numbers for brevity
+  { 
+    device_set_text_matrix(dev, operand_stack[0].value.number, 
+		    	   	operand_stack[1].value.number, 
+				operand_stack[2].value.number,
+			       	operand_stack[3].value.number, 
+				operand_stack[4].value.number, 
+				operand_stack[5].value.number);
   }
 }
 
@@ -108,8 +124,13 @@ handle_Tf(p2c_device_t *dev,
        operand_stack[0].type == OP_TYPE_NAME && 
         operand_stack[1].type == OP_TYPE_NUMBER)
   {
-    if (g_verbose) printf("DEBUG: Operator Tf (Set Font) with name %s and size %f\n", operand_stack[0].value.name, operand_stack[1].value.number);
-    device_set_font(dev, operand_stack[0].value.name + 1, operand_stack[1].value.number); // +1 to skip leading '/'
+    if (g_verbose) 
+      fprintf(stderr, "DEBUG: Operator Tf (Set Font) with name %s and size %f\n", 
+		       operand_stack[0].value.name, 
+		       operand_stack[1].value.number);
+
+    device_set_font(dev, operand_stack[0].value.name + 1, 
+		     	 operand_stack[1].value.number); // +1 to skip leading '/'
   }
 }
 
@@ -120,7 +141,10 @@ handle_Tj(p2c_device_t *dev,
   if (operand_stack_ptr == 1 && 
        operand_stack[0].type == OP_TYPE_STRING) 
   {
-    if (g_verbose) printf("DEBUG: Operator Tj (Show Text) with string \"%s\"\n", operand_stack[0].value.string);
+    if (g_verbose) 
+      fprintf(stderr, "DEBUG: Operator Tj (Show Text) with string \"%s\"\n", 
+	       operand_stack[0].value.string);
+
     device_show_text(dev, operand_stack[0].value.string);
   }
 }
@@ -142,7 +166,9 @@ handle_w(p2c_device_t *dev,
   if (operand_stack_ptr == 1 && 
        operand_stack[0].type == OP_TYPE_NUMBER) 
   {
-    if (g_verbose) printf("DEBUG: Operator w (Set Line Width) with arg %f\n", operand_stack[0].value.number);
+    if (g_verbose) 
+      fprintf(stderr, "DEBUG: Operator w (Set Line Width) with arg %f\n", 
+		       operand_stack[0].value.number);
     device_set_line_width(dev, operand_stack[0].value.number);
   }
 }
@@ -151,9 +177,17 @@ static void
 handle_rg(p2c_device_t *dev, 
 	  pdfio_dict_t *resources) 
 {
-  if (operand_stack_ptr == 3) { // Assume numbers
-    if (g_verbose) printf("DEBUG: Operator rg (Set Fill RGB) with args (%f, %f, %f)\n", operand_stack[0].value.number, operand_stack[1].value.number, operand_stack[2].value.number);
-    device_set_fill_rgb(dev, operand_stack[0].value.number, operand_stack[1].value.number, operand_stack[2].value.number);
+  if (operand_stack_ptr == 3) // Assume numbers
+  {
+    if (g_verbose) 
+      fprintf(stderr, "DEBUG: Operator rg (Set Fill RGB) with args (%f, %f, %f)\n", 
+	       operand_stack[0].value.number, 
+	       operand_stack[1].value.number, 
+	       operand_stack[2].value.number);
+
+    device_set_fill_rgb(dev, operand_stack[0].value.number, 
+		    	     operand_stack[1].value.number, 
+			     operand_stack[2].value.number);
   }
 }
 
@@ -161,9 +195,17 @@ static void
 handle_RG(p2c_device_t *dev, 
 	  pdfio_dict_t *resources) 
 {
-  if (operand_stack_ptr == 3) { // Assume numbers
-    if (g_verbose) printf("DEBUG: Operator RG (Set Stroke RGB) with args (%f, %f, %f)\n", operand_stack[0].value.number, operand_stack[1].value.number, operand_stack[2].value.number);
-    device_set_stroke_rgb(dev, operand_stack[0].value.number, operand_stack[1].value.number, operand_stack[2].value.number);
+  if (operand_stack_ptr == 3) // Assume numbers
+  { 
+    if (g_verbose) 
+      fprintf(stderr, "DEBUG: Operator RG (Set Stroke RGB) with args (%f, %f, %f)\n", 
+		       operand_stack[0].value.number, 
+		       operand_stack[1].value.number,
+		       operand_stack[2].value.number);
+
+    device_set_stroke_rgb(dev, operand_stack[0].value.number, 
+		    	       operand_stack[1].value.number, 
+			       operand_stack[2].value.number);
   }
 }
 
@@ -174,7 +216,10 @@ handle_g(p2c_device_t *dev,
   if (operand_stack_ptr == 1 && 
        operand_stack[0].type == OP_TYPE_NUMBER) 
   {
-    if (g_verbose) printf("DEBUG: Operator g (Set Fill Gray) with arg %f\n", operand_stack[0].value.number);
+    if (g_verbose) 
+      fprintf(stderr, "DEBUG: Operator g (Set Fill Gray) with arg %f\n", 
+	       	       operand_stack[0].value.number);
+
     device_set_fill_gray(dev, operand_stack[0].value.number);
   }
 }
@@ -186,7 +231,10 @@ handle_G(p2c_device_t *dev,
   if (operand_stack_ptr == 1 && 
        operand_stack[0].type == OP_TYPE_NUMBER) 
   {
-    if (g_verbose) printf("DEBUG: Operator G (Set Stroke Gray) with arg %f\n", operand_stack[0].value.number);
+    if (g_verbose) 
+      fprintf(stderr, "DEBUG: Operator G (Set Stroke Gray) with arg %f\n", 
+	  	       operand_stack[0].value.number);
+
     device_set_stroke_gray(dev, operand_stack[0].value.number);
   }
 }
@@ -195,9 +243,15 @@ static void
 handle_m(p2c_device_t *dev, 
 	 pdfio_dict_t *resources) 
 {
-  if (operand_stack_ptr == 2) { // Assume numbers
-    if (g_verbose) printf("DEBUG: Operator m (Move To) with args (%f, %f)\n", operand_stack[0].value.number, operand_stack[1].value.number);
-    device_move_to(dev, operand_stack[0].value.number, operand_stack[1].value.number);
+  if (operand_stack_ptr == 2) // Assume numbers
+  {
+    if (g_verbose) 
+      fprintf(stderr, "DEBUG: Operator m (Move To) with args (%f, %f)\n", 
+		       operand_stack[0].value.number, 
+		       operand_stack[1].value.number);
+
+    device_move_to(dev, operand_stack[0].value.number, 
+		        operand_stack[1].value.number);
   }
 }
 
@@ -205,9 +259,15 @@ static void
 handle_l(p2c_device_t *dev, 
 	 pdfio_dict_t *resources) 
 {
-  if (operand_stack_ptr == 2) { // Assume numbers
-    if (g_verbose) printf("DEBUG: Operator l (Line To) with args (%f, %f)\n", operand_stack[0].value.number, operand_stack[1].value.number);
-    device_line_to(dev, operand_stack[0].value.number, operand_stack[1].value.number);
+  if (operand_stack_ptr == 2) // Assume Numbers
+  { 
+    if (g_verbose) 
+      fprintf(stderr, "DEBUG: Operator l (Line To) with args (%f, %f)\n", 
+	       	       operand_stack[0].value.number, 
+		       operand_stack[1].value.number);
+    
+    device_line_to(dev, operand_stack[0].value.number, 
+		        operand_stack[1].value.number);
   }
 }
 
@@ -215,9 +275,17 @@ static void
 handle_c(p2c_device_t *dev, 
 	 pdfio_dict_t *resources) 
 {
-  if (operand_stack_ptr == 6) { // Assume numbers
-    if (g_verbose) printf("DEBUG: Operator c (Curve To) with args (%f,%f %f,%f %f,%f)\n", operand_stack[0].value.number, operand_stack[1].value.number, operand_stack[2].value.number, operand_stack[3].value.number, operand_stack[4].value.number, operand_stack[5].value.number);
-    device_curve_to(dev, operand_stack[0].value.number, operand_stack[1].value.number, operand_stack[2].value.number, operand_stack[3].value.number, operand_stack[4].value.number, operand_stack[5].value.number);
+  if (operand_stack_ptr == 6) // Assume numbers
+  {
+    if (g_verbose) 
+      fprintf(stderr, "DEBUG: Operator c (Curve To) with args (%f,%f %f,%f %f,%f)\n", 
+		       operand_stack[0].value.number, operand_stack[1].value.number, 
+		       operand_stack[2].value.number, operand_stack[3].value.number, 
+		       operand_stack[4].value.number, operand_stack[5].value.number);
+
+    device_curve_to(dev, operand_stack[0].value.number, operand_stack[1].value.number, 
+		         operand_stack[2].value.number, operand_stack[3].value.number, 
+			 operand_stack[4].value.number, operand_stack[5].value.number);
   }
 }
 
@@ -237,7 +305,9 @@ handle_v(p2c_device_t *dev,
     double x3 = operand_stack[2].value.number;
     double y3 = operand_stack[3].value.number;
 
-    if (g_verbose) printf("DEBUG: Operator v (Curve) %f %f %f %f\n", x2, y2, x3, y3);
+    if (g_verbose) 
+      fprintf(stderr, "DEBUG: Operator v (Curve) %f %f %f %f\n", x2, y2, x3, y3);
+
     device_curve_to(dev, x1, y1, x2, y2, x3, y3);
   }
 }
@@ -255,7 +325,9 @@ handle_y(p2c_device_t *dev,
     double x3 = operand_stack[2].value.number;
     double y3 = operand_stack[3].value.number;
 
-    if (g_verbose) printf("DEBUG: Operator y (Curve) %f %f %f %f\n", x1, y1, x3, y3);
+    if (g_verbose)
+      fprintf(stderr, "DEBUG: Operator y (Curve) %f %f %f %f\n", x1, y1, x3, y3);
+
     // Pass x3, y3 as both the second control point and the end point
     device_curve_to(dev, x1, y1, x3, y3, x3, y3);
   }
@@ -265,9 +337,15 @@ static void
 handle_re(p2c_device_t *dev, 
 	  pdfio_dict_t *resources) 
 {
-  if (operand_stack_ptr == 4) { // Assume numbers
-    if (g_verbose) printf("DEBUG: Operator re (Rectangle) with args (%f, %f, %f, %f)\n", operand_stack[0].value.number, operand_stack[1].value.number, operand_stack[2].value.number, operand_stack[3].value.number);
-    device_rectangle(dev, operand_stack[0].value.number, operand_stack[1].value.number, operand_stack[2].value.number, operand_stack[3].value.number);
+  if (operand_stack_ptr == 4) // Assume numbers
+  { 
+    if (g_verbose) 
+      fprintf(stderr, "DEBUG: Operator re (Rectangle) with args (%f, %f, %f, %f)\n", 
+		       operand_stack[0].value.number, operand_stack[1].value.number, 
+		       operand_stack[2].value.number, operand_stack[3].value.number);
+
+    device_rectangle(dev, operand_stack[0].value.number, operand_stack[1].value.number, 
+		    	  operand_stack[2].value.number, operand_stack[3].value.number);
   }
 }
 
@@ -275,7 +353,9 @@ static void
 handle_h(p2c_device_t *dev, 
 	 pdfio_dict_t *resources) 
 {
-  if (g_verbose) printf("DEBUG: Operator h (Close Path)\n");
+  if (g_verbose) 
+    fprintf(stderr, "DEBUG: Operator h (Close Path)\n");
+
   device_close_path(dev);
 }
 
@@ -283,7 +363,9 @@ static void
 handle_S(p2c_device_t *dev, 
 	 pdfio_dict_t *resources) 
 {
-  if (g_verbose) printf("DEBUG: Operator S (Stroke Path)\n");
+  if (g_verbose) 
+   fprintf(stderr, "DEBUG: Operator S (Stroke Path)\n");
+
   device_stroke(dev);
 }
 
@@ -291,7 +373,8 @@ static void
 handle_f(p2c_device_t *dev, 
 	 pdfio_dict_t *resources) 
 {
-  if (g_verbose) printf("DEBUG: Operator f (Fill Path)\n");
+  if (g_verbose) 
+    fprintf(stderr, "DEBUG: Operator f (Fill Path)\n");
   device_fill(dev);
 }
 
@@ -299,7 +382,9 @@ static void
 handle_f_star(p2c_device_t *dev, 
 	      pdfio_dict_t *resources) 
 {
-  if (g_verbose) printf("DEBUG: Operator f* (Fill Path Even-Odd)\n");
+  if (g_verbose) 
+    fprintf(stderr, "DEBUG: Operator f* (Fill Path Even-Odd)\n");
+
   device_fill_even_odd(dev);
 }
 
@@ -307,7 +392,9 @@ static void
 handle_B(p2c_device_t *dev, 
 	 pdfio_dict_t *resources) 
 {
-  if (g_verbose) printf("DEBUG: Operator B (Fill and Stroke Path)\n");
+  if (g_verbose) 
+    fprintf(stderr, "DEBUG: Operator B (Fill and Stroke Path)\n");
+
   device_fill_preserve(dev);
   device_stroke(dev);
 }
@@ -316,7 +403,9 @@ static void
 handle_B_star(p2c_device_t *dev, 
 	      pdfio_dict_t *resources) 
 {
-  if (g_verbose) printf("DEBUG: Operator B* (Fill and Stroke Path Even-Odd)\n");
+  if (g_verbose) 
+    fprintf(stderr, "DEBUG: Operator B* (Fill and Stroke Path Even-Odd)\n");
+
   device_fill_preserve_even_odd(dev);
   device_stroke(dev);
 }
@@ -325,7 +414,9 @@ static void
 handle_b(p2c_device_t *dev, 
 	 pdfio_dict_t *resources) 
 {
-  if (g_verbose) printf("DEBUG: Operator b (Close, Fill, and Stroke Path)\n");
+  if (g_verbose) 
+    fprintf(stderr, "DEBUG: Operator b (Close, Fill, and Stroke Path)\n");
+
   device_close_path(dev);
   device_fill_preserve(dev);
   device_stroke(dev);
@@ -335,7 +426,9 @@ static void
 handle_b_star(p2c_device_t *dev, 
 	      pdfio_dict_t *resources) 
 {
-  if (g_verbose) printf("DEBUG: Operator b* (Close, Fill, and Stroke Path Even-Odd)\n");
+  if (g_verbose) 
+    fprintf(stderr, "DEBUG: Operator b* (Close, Fill, and Stroke Path Even-Odd)\n");
+
   device_close_path(dev);
   device_fill_preserve_even_odd(dev);
   device_stroke(dev);
@@ -345,7 +438,8 @@ static void
 handle_n(p2c_device_t *dev, 
 	 pdfio_dict_t *resources) 
 {
-  if (g_verbose) printf("DEBUG: Operator n (New Path / No-Op)\n");
+  if (g_verbose) 
+    fprintf(stderr, "DEBUG: Operator n (New Path / No-Op)\n");
   // This is a no-op for our device, as paths are implicitly started.
 }
 
@@ -353,7 +447,9 @@ static void
 handle_W(p2c_device_t *dev, 
 	 pdfio_dict_t *resources) 
 {
-  if (g_verbose) printf("DEBUG: Operator W (Clip Path)\n");
+  if (g_verbose) 
+    fprintf(stderr, "DEBUG: Operator W (Clip Path)\n");
+
   device_clip(dev);
 }
 
@@ -361,7 +457,9 @@ static void
 handle_W_star(p2c_device_t *dev, 
 	      pdfio_dict_t *resources) 
 {
-  if (g_verbose) printf("DEBUG: Operator W* (Clip Path Even-Odd)\n");
+  if (g_verbose) 
+    fprintf(stderr, "DEBUG: Operator W* (Clip Path Even-Odd)\n");
+
   device_clip_even_odd(dev);
 }
 
@@ -372,7 +470,10 @@ handle_gs(p2c_device_t *dev,
   if (operand_stack_ptr == 1 && 
        operand_stack[0].type == OP_TYPE_NAME) 
   {
-    if (g_verbose) printf("DEBUG: Operator gs (Set Graphics State) with name %s\n", operand_stack[0].value.name);
+    if (g_verbose) 
+      fprintf(stderr, "DEBUG: Operator gs (Set Graphics State) with name %s\n", 
+		       operand_stack[0].value.name);
+
     device_set_graphics_state(dev, resources, operand_stack[0].value.name + 1); // +1 to skip leading '/'
   }
 }
@@ -384,10 +485,9 @@ handle_cm(p2c_device_t *dev,
   // 'cm' expects 6 numbers on the stack: a b c d e f cm
   if (operand_stack_ptr == 6)
   {
-    device_transform(dev,
-        operand_stack[0].value.number, operand_stack[1].value.number,
-        operand_stack[2].value.number, operand_stack[3].value.number,
-        operand_stack[4].value.number, operand_stack[5].value.number);
+    device_transform(dev, operand_stack[0].value.number, operand_stack[1].value.number,
+        		  operand_stack[2].value.number, operand_stack[3].value.number,
+			  operand_stack[4].value.number, operand_stack[5].value.number);
   }
 }
 
@@ -398,7 +498,9 @@ handle_cs(p2c_device_t *dev,
   if (operand_stack_ptr == 1 && 
        operand_stack[0].type == OP_TYPE_NAME) 
   {
-    if (g_verbose) printf("DEBUG: Operator cs (Set fill Color Space) with name %s\n", operand_stack[0].value.name);
+    if (g_verbose) 
+      fprintf(stderr, "DEBUG: Operator cs (Set fill Color Space) with name %s\n", 
+		       operand_stack[0].value.name);
   }
 }
 
@@ -409,7 +511,9 @@ handle_CS(p2c_device_t *dev,
   if (operand_stack_ptr == 1 && 
        operand_stack[0].type == OP_TYPE_NAME) 
   {
-    if (g_verbose) printf("DEBUG: Operator CS (Set Stroke Color Space) with name %s \n", operand_stack[0].value.name);
+    if (g_verbose) 
+      fprintf(stderr, "DEBUG: Operator CS (Set Stroke Color Space) with name %s \n", 
+		       operand_stack[0].value.name);
   }
 }
 
@@ -417,9 +521,17 @@ static void
 handle_k(p2c_device_t *dev, 
  	 pdfio_dict_t *resources) 
 {
-  if (operand_stack_ptr == 4) { // Assume numbers
-    if (g_verbose) printf("DEBUG: Operator k (Set Fill CMYK) with args (%f, %f, %f, %f)\n", operand_stack[0].value.number, operand_stack[1].value.number, operand_stack[2].value.number, operand_stack[3].value.number);
-    device_set_fill_cmyk(dev, operand_stack[0].value.number, operand_stack[1].value.number, operand_stack[2].value.number, operand_stack[3].value.number);
+  if (operand_stack_ptr == 4) // Assume numbers
+  {
+    if (g_verbose) 
+      fprintf(stderr, "DEBUG: Operator k (Set Fill CMYK) with args (%f, %f, %f, %f)\n", 
+	      	       operand_stack[0].value.number, operand_stack[1].value.number, 
+		       operand_stack[2].value.number, operand_stack[3].value.number);
+   
+    device_set_fill_cmyk(dev, operand_stack[0].value.number, 
+		    	      operand_stack[1].value.number, 
+			      operand_stack[2].value.number, 
+			      operand_stack[3].value.number);
   }
 }
 
@@ -427,9 +539,17 @@ static void
 handle_K(p2c_device_t *dev, 
 	 pdfio_dict_t *resources) 
 {
-  if (operand_stack_ptr == 4) { // Assume numbers
-    if (g_verbose) printf("DEBUG: Operator K (Set Stroke CMYK) with args (%f, %f, %f, %f)\n", operand_stack[0].value.number, operand_stack[1].value.number, operand_stack[2].value.number, operand_stack[3].value.number);
-    device_set_stroke_cmyk(dev, operand_stack[0].value.number, operand_stack[1].value.number, operand_stack[2].value.number, operand_stack[3].value.number);
+  if (operand_stack_ptr == 4) 
+  {
+    if (g_verbose) 
+      fprintf(stderr, "DEBUG: Operator K (Set Stroke CMYK) with args (%f, %f, %f, %f)\n", 
+	      	       operand_stack[0].value.number, operand_stack[1].value.number, 
+		       operand_stack[2].value.number, operand_stack[3].value.number);
+
+    device_set_stroke_cmyk(dev, operand_stack[0].value.number, 
+		    		operand_stack[1].value.number, 
+				operand_stack[2].value.number, 
+				operand_stack[3].value.number);
   }
 }
 
@@ -442,7 +562,8 @@ handle_Tr(p2c_device_t *dev,
        operand_stack[0].type == OP_TYPE_NUMBER) 
   {
     int mode = (int)operand_stack[0].value.number;
-    if (g_verbose) printf("DEBUG: Operator Tr (Set Text Rendering Mode) with mode %d\n", mode);
+    if (g_verbose) 
+      fprintf(stderr, "DEBUG: Operator Tr (Set Text Rendering Mode) with mode %d\n", mode);
     // This is a placeholder for the actual device function you'll write
     // For now, let's just imagine it exists
     // device_set_text_rendering_mode(dev, mode);
@@ -456,67 +577,72 @@ handle_Tr(p2c_device_t *dev,
 
 // --- Dispatch Table and Logic ---
 
-// 1. Define a type for our handler functions
+// type for our handler functions
 typedef void (*pdf_operator_handler_t)(p2c_device_t *dev, pdfio_dict_t *resources);
 
-// 2. Define the structure for our lookup table entries
-typedef struct {
-    const char *name;
-    pdf_operator_handler_t handler;
+// structure for lookup table entries
+typedef struct 
+{
+  const char *name;
+  pdf_operator_handler_t handler;
 } pdf_operator_t;
 
-// 3. Create the lookup table.
+// lookup table for Operators
 // IMPORTANT: This table MUST be sorted alphabetically by operator name for bsearch to work.
-static const pdf_operator_t operator_table[] = {
-    {"B", handle_B},
-    {"B*", handle_B_star},
-    {"BT", handle_BT},
-    {"CS", handle_CS},
-    {"ET", handle_ET},
-    {"G", handle_G},
-    {"K", handle_K},
-    {"Q", handle_Q},
-    {"RG", handle_RG},
-    {"S", handle_S},
-    {"T*", handle_T_star},
-    {"TD", handle_TD},
-    {"TJ", handle_TJ},
-    {"Td", handle_Td},
-    {"Tf", handle_Tf},
-    {"Tj", handle_Tj},
-    {"Tm", handle_Tm},
-    {"Tr", handle_Tr},
-    {"W", handle_W},
-    {"W*", handle_W_star},
-    {"b", handle_b},
-    {"b*", handle_b_star},
-    {"c", handle_c},
-    {"cm", handle_cm},
-    {"cs", handle_cs},
-    {"f", handle_f},
-    {"f*", handle_f_star},
-    {"g", handle_g},
-    {"gs", handle_gs},
-    {"h", handle_h},
-    {"k", handle_k},
-    {"l", handle_l},
-    {"m", handle_m},
-    {"n", handle_n},
-    {"q", handle_q},
-    {"re", handle_re},
-    {"rg", handle_rg},
-    {"v", handle_v},
-    {"w", handle_w},
-    {"y", handle_y},
+static const pdf_operator_t operator_table[] = 
+{
+  {"B", 	handle_B},
+  {"B*", 	handle_B_star},
+  {"BT", 	handle_BT},
+  {"CS", 	handle_CS},
+  {"ET", 	handle_ET},
+  {"G", 	handle_G},
+  {"K", 	handle_K},
+  {"Q", 	handle_Q},
+  {"RG", 	handle_RG},
+  {"S", 	handle_S},
+  {"T*", 	handle_T_star},
+  {"TD", 	handle_TD},
+  {"TJ", 	handle_TJ},
+  {"Td", 	handle_Td},
+  {"Tf", 	handle_Tf},
+  {"Tj", 	handle_Tj},
+  {"Tm", 	handle_Tm},
+  {"Tr", 	handle_Tr},
+  {"W", 	handle_W},
+  {"W*", 	handle_W_star},
+  {"b", 	handle_b},
+  {"b*", 	handle_b_star},
+  {"c", 	handle_c},
+  {"cm", 	handle_cm},
+  {"cs", 	handle_cs},
+  {"f", 	handle_f},
+  {"f*", 	handle_f_star},
+  {"g", 	handle_g},
+  {"gs", 	handle_gs},
+  {"h", 	handle_h},
+  {"k", 	handle_k},
+  {"l", 	handle_l},
+  {"m", 	handle_m},
+  {"n", 	handle_n},
+  {"q", 	handle_q},
+  {"re", 	handle_re},
+  {"rg", 	handle_rg},
+  {"v", 	handle_v},
+  {"w", 	handle_w},
+  {"y", 	handle_y},
 };
 
 static const size_t operator_table_size = sizeof(operator_table) / sizeof(operator_table[0]);
 
-// 4. Create a comparison function for bsearch
-static int compare_operators(const void *a, const void *b) {
-    const char *token = (const char *)a;
-    const pdf_operator_t *op = (const pdf_operator_t *)b;
-    return strcmp(token, op->name);
+// Create a comparison function for bsearch
+static int 
+compare_operators(const void *a, 
+		  const void *b) 
+{
+  const char *token = (const char *)a;
+  const pdf_operator_t *op = (const pdf_operator_t *)b;
+  return strcmp(token, op->name);
 }
 
 void 
@@ -533,7 +659,7 @@ process_content_stream(p2c_device_t *dev,
     pdfio_stream_t *st = pdfioPageOpenStream(page_data->object, i, true);
     while (pdfioStreamGetToken(st, token, sizeof(token)))
     { 
-      if (g_verbose) fprintf(stderr, "DEBUG: Token: '%s'\n", token);
+      //fprintf(stderr, "DEBUG: Token: '%s'\n", token);
       if (isdigit(token[0]) || token[0] == '-' || token[0] == '+' || token[0] == '.')
       {
         // We have a number, push it on the operand stack
@@ -588,6 +714,7 @@ process_content_stream(p2c_device_t *dev,
       else if (token[0] != '[' && token[0] != ']')
       {
         // We have an operator, find it in the table and execute it.
+        fprintf(stderr, "hello DEBUG: Token: '%s'\n", token);
         const pdf_operator_t *op = bsearch(token, operator_table, operator_table_size, sizeof(pdf_operator_t), compare_operators);
 
         if (op) 
