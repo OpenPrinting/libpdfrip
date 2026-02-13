@@ -1,102 +1,54 @@
 # libpdfrip
 
-libpdfrip is a high-performance PDF rendering and analysis tool built on top of **libpdfio** and the **Cairo 2D** graphics library. It provides efficient page rendering to PNG format and includes a content stream inspection utility for debugging and development.
+libpdfrip is a C library for rendering PDF pages to PNG images using the Cairo graphics library and PDFio for PDF parsing.
 
-## Features
+## Purpose
 
-* Render individual PDF pages directly to PNG.
-* Configurable output resolution (DPI).
-* Content stream analysis mode for inspecting PDF operator usage.
-* Optional verbose logging for detailed diagnostics.
-* Flexible output naming conventions to support automation and testing.
+libpdfrip provides PDF page rendering functionality for applications that need to convert PDF documents to raster images. The library uses PDFio to parse PDF structure and Cairo to render vector graphics and text to PNG output.
 
-## Dependencies
+## Requirements
 
-The following libraries and tools must be installed:
+The following tools and libraries are required to build libpdfrip:
 
 * C compiler (gcc or clang)
 * make
 * pkg-config
-* libpdfio (development headers)
-* cairo (development headers)
-* freetype2 (development headers)
-* libpng (development headers)
+* PDFio
+* Cairo
+* FreeType2
+* libpng
 
-### Debian/Ubuntu Installation
+### Installing tools on Debian/Ubuntu
 
-```
+Install the required packages with:
+
+```bash
 sudo apt-get install build-essential pkg-config libpdfio-dev libcairo2-dev libfreetype6-dev libpng-dev
 ```
 
-## Building
+## Building libpdfrip
 
-```
+To build libpdfrip from source:
+
+```bash
 git clone https://github.com/OpenPrinting/libpdfrip.git
 cd libpdfrip
 make
 ```
 
-This produces:
+The build produces the following executables:
 
-* `pdf2cairo/pdf2cairo_main` – primary rendering and analysis tool
-* `testpdf2cairo` – test runner
+* `pdf2cairo/pdf2cairo_main` - PDF rendering and analysis tool
+* `testpdf2cairo` - test runner
 
-## Usage
+## Documentation
 
-```
-./pdf2cairo/pdf2cairo_main [options] input.pdf
-```
-
-### Options
-
-| Flag        | Argument       | Description                                                        |
-| ----------- | -------------- | ------------------------------------------------------------------ |
-| `--analyze` |                | Analyze PDF content streams instead of rendering output.           |
-| `--help`    |                | Display usage information.                                         |
-| `-o`        | `<output.png>` | Output PNG filename when rendering.                                |
-| `-p`        | `<pagenum>`    | Page number to process (default: 1).                               |
-| `-r`        | `<dpi>`        | Output resolution in DPI (default: 72).                            |
-| `-t`        |                | Generate a temporary output filename (requires `-d`).              |
-| `-d`        | `<directory>`  | Output directory when using `-t`.                                  |
-| `-T`        |                | Generate a temporary filename inside `testfiles/renderer-output/`. |
-| `-v`        |                | Enable verbose diagnostic output.                                  |
-
-### Examples
-
-Render page 1 to PNG:
-
-```
-./pdf2cairo/pdf2cairo_main -o output.png document.pdf
-```
-
-Render page 5 at 300 DPI:
-
-```
-./pdf2cairo/pdf2cairo_main -p 5 -r 300 -o high-res.png document.pdf
-```
-
-Analyze page 2 content stream:
-
-```
-./pdf2cairo/pdf2cairo_main --analyze -p 2 document.pdf
-```
-
-## Testing
-
-```
-make test
-```
-
-Test output images are written to:
-
-```
-testfiles/renderer-output/
-```
+Detailed contributor documentation is available in the `docs/` directory, including background material on PDF internals and Form XObjects.
 
 ## Contributing
 
-Contributions are welcomed. All pull requests must:
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on submitting pull requests and reporting issues.
 
-* Pass the existing test suite (`make test`).
-* Follow the current code structure and formatting conventions.
+## License
 
+See [LICENSE](LICENSE) and [NOTICE](NOTICE) for license information.
