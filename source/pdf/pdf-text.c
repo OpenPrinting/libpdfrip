@@ -3,6 +3,7 @@
 //
 
 #include "pdfops-private.h"
+#include "../cairo/cairo-private.h"
 #include <string.h>
 
 typedef struct name_map_s
@@ -1201,3 +1202,18 @@ load_encoding(
     }
   }
 }
+
+//
+// 'getPageFonts()' - Get Font Glyphs
+//
+
+bool 					  // O - 1 on error, 0 on success	
+getPageFonts(p2c_device_t *dev, 	// I - PDF2Cairo Conversion document
+	     size_t cur_page)		// I - Current Page Number
+{
+  for(size_t cur_font=0; cur_font < dev->num_fonts; cur_font++) 
+  {
+     
+  }
+  return true;
+}	

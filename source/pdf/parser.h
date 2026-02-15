@@ -6,13 +6,13 @@
 // information.
 //
 
-
-#ifndef INTERPRETER_H
-#define INTERPRETER_H
+#ifndef PARSER_H
+#define PARSER_H
 
 #include <pdfio.h>
 #include "pdfops-private.h"
 
+typedef struct pdfrip_page_s pdfrip_page_t;
 typedef struct cairo_device_s p2c_device_t;
 
 // Defines the types of operands that can be on the stack
@@ -47,4 +47,4 @@ typedef struct operand_s
 void process_content_stream(p2c_device_t *dev, pdfrip_page_t *page_data);
 		
 
-#endif // INTERPRETER_H
+#endif // PARSER_H

@@ -12,6 +12,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pdfio.h>
+#include "../cairo/cairo-device-private.h"
+
+typedef struct cairo_device_s p2c_device_t;
 
 typedef struct pdfrip_doc_s
 {
@@ -28,6 +31,7 @@ void 	      freePDFdoc(pdfrip_doc_t *PDF_data);	// free the data structure
 
 typedef struct pdfrip_page_s
 {
+  pdfrip_doc_t		*parent_doc;		// PDF Document Data
   pdfio_obj_t		*object;		// Page Object
   pdfio_obj_t		*resource_object;	// Page Resource Object
   pdfio_dict_t		*object_dict,		// Page Dictionary
@@ -38,9 +42,10 @@ typedef struct pdfrip_page_s
   unsigned short 	gen_number;		// Object Generation Number
 } pdfrip_page_t;
 
-pdfrip_page_t* getPageData(pdfio_file_t *pdf, size_t page_number); // get Page Data from PDF
+pdfrip_page_t* getPageData(pdfrip_doc_t *pdf_doc, size_t page_number); // get Page Data from PDF
 void freePageData(pdfrip_page_t *page);
 
 // Text helper functions
+bool getPageFonts(p2c_device_t *dev, size_t cur_page);
 void load_encoding(pdfio_obj_t *page_obj, const char *name, int encoding[256]);
-#endif
+#endif //PDFOPS_PRIVATE_H

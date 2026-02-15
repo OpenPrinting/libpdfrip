@@ -7,7 +7,7 @@
 //
 
 #include "parser.h"
-#include "cairo_device.h"
+#include "cairo-device-private.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -650,7 +650,7 @@ process_content_stream(p2c_device_t *dev,
 		       pdfrip_page_t *page_data)
 {
   char token[1024];
-  device_set_resources(dev, page_data->resources_dict);
+
   // Reset the operand stacks
   operand_stack_ptr = 0;
 
@@ -714,7 +714,7 @@ process_content_stream(p2c_device_t *dev,
       else if (token[0] != '[' && token[0] != ']')
       {
         // We have an operator, find it in the table and execute it.
-        fprintf(stderr, "hello DEBUG: Token: '%s'\n", token);
+        //fprintf(stderr, "hello DEBUG: Token: '%s'\n", token);
         const pdf_operator_t *op = bsearch(token, operator_table, operator_table_size, sizeof(pdf_operator_t), compare_operators);
 
         if (op) 

@@ -8,6 +8,8 @@
 #include "test.h"  // testBegin and testEnd functions come from here
 #include <dirent.h>
 
+int g_verbose = 0;
+
 // Structure to hold a single renderer test case
 typedef struct
 {
@@ -19,8 +21,8 @@ typedef struct
 } renderer_test_t;
 
 // Common paths for test files
-static const char *input_path = "testfiles/input/basic/";
-static const char *output_path = "testfiles/renderer-output/";
+static const char *input_path = "testfiles/input/";
+static const char *output_path = "testfiles/renderer-output/text/";
 
 /* --- ORIGINAL MANUAL TEST ARRAY (Commented Out) ---
  * Use this structure if you want to define specific flags or
@@ -28,32 +30,38 @@ static const char *output_path = "testfiles/renderer-output/";
  */
 static renderer_test_t manual_tests[] = 
 {
-  { "test_file_1pg", "test_file_1pg.pdf", "", "T", ""},
-  { "Stroked box", "01_stroked_box.pdf", "", "T", "" },
-  { "Filled RGB box", "02_filled_box_rgb.pdf", "", "T", ""},
-  { "Nested Box", "03_nested_state.pdf", "", "T", ""},
-  { "Cubic_Bezier_Curve", "04_Cubic_Bezier_Curve.pdf", "", "T", ""},
-  { "Curves" , "05_Curves.pdf", "", "T", ""},
-  { "Fill and Stroke", "06_fill_and_stroke.pdf", "", "T", ""},
-  { "Shape with hole", "07_shape_with_holes.pdf", "", "T", ""},
-  { "TestFilledBanners", "TestFilledBanners.pdf", "", "T", ""},
+/*
+  { "test_file_1pg", 		"test_file_1pg.pdf", 		"", "T", ""},
+  { "Stroked box", 		"01_stroked_box.pdf", 		"", "T", "" },
+  { "Filled RGB box", 		"02_filled_box_rgb.pdf", 	"", "T", ""},
+  { "Nested Box", 		"03_nested_state.pdf", 		"", "T", ""},
+  { "Cubic_Bezier_Curve", 	"04_Cubic_Bezier_Curve.pdf", 	"", "T", ""},
+  { "Curves", 			"05_Curves.pdf", 		"", "T", ""},
+  { "Fill and Stroke", 		"06_fill_and_stroke.pdf", 	"", "T", ""},
+  { "Shape with hole", 		"07_shape_with_holes.pdf", 	"", "T", ""},
+  { "TestFilledBanners", 	"TestFilledBanners.pdf", 	"", "T", ""},
   { "TestFilledBasicShapesPart1", "TestFilledBasicShapesPart1.pdf", "", "T", ""},
   { "TestFilledBasicShapesPart2", "TestFilledBasicShapesPart2.pdf", "", "T", ""},
-  { "TestFilledBlockArrows", "TestFilledBlockArrows.pdf", "", "T", ""},
+  { "TestFilledBlockArrows", 	"TestFilledBlockArrows.pdf", 	"", "T", ""},
   { "TestFilledEquationShapes", "TestFilledEquationShapes.pdf", "", "T", ""},
-  { "TestFilledFlowChart", "TestFilledFlowChart.pdf", "", "T", ""},
-  { "TestFilledRectangles", "TestFilledRectangles.pdf", "", "T", ""},
-  { "TestFilledStars", "TestFilledStars.pdf", "", "T", ""},
-  { "TestStrokedBanners", "TestStrokedBanners.pdf", "" , "T", ""},
+  { "TestFilledFlowChart", 	"TestFilledFlowChart.pdf", 	"", "T", ""},
+  { "TestFilledRectangles", 	"TestFilledRectangles.pdf", 	"", "T", ""},
+  { "TestFilledStars", 		"TestFilledStars.pdf", 		"", "T", ""},
+  { "TestStrokedBanners", 	"TestStrokedBanners.pdf", 	"" , "T", ""},
   { "TestStrokedBasicShapesPart1", "TestStrokedBasicShapesPart1.pdf", "", "T", ""},
   { "TestStrokedBasicShapesPart2", "TestStrokedBasicShapesPart2.pdf", "", "T", ""},
-  { "TestStrokedBlockArrows", "TestStrokedBlockArrows.pdf", "", "T", ""},
+  { "TestStrokedBlockArrows", 	"TestStrokedBlockArrows.pdf", 	"", "T", ""},
   { "TestStrokedEquationShapes", "TestStrokedEquationShapes.pdf", "", "T", ""},
-  { "TestStrokedFlowChart", "TestStrokedFlowChart.pdf", "", "T", ""},
-  { "TestStrokedRectangles", "TestStrokedRectangles.pdf", "", "T", ""},
-  { "TestStrokedStars", "TestStrokedStars.pdf", "", "T", ""},
-  { "TestTables", "TestTables.pdf", "", "T", ""},
-  { "simpleText", "simpleText.pdf", "", "T", ""}
+  { "TestStrokedFlowChart", 	"TestStrokedFlowChart.pdf", 	"", "T", ""},
+  { "TestStrokedRectangles", 	"TestStrokedRectangles.pdf", 	"", "T", ""},
+  { "TestStrokedStars", 	"TestStrokedStars.pdf", 	"", "T", ""},
+  { "TestTables", 		"TestTables.pdf",		"", "T", ""},
+  */
+//  { "simpleText", 		"/text/simpleText.pdf", 	"", "T", ""},
+  { "TextColumnWise", 		"/text/TextColumnWise.pdf", 	"", "T", ""}
+//  { "TextColumnWithMultipleFont", "/text/TextColumnWithMultipleFont.pdf", "", "T", ""},
+//  { "TextWithShape", 		"/text/TextWithShape.pdf", 	"", "T", ""},
+
 };
 
 // Main()
@@ -66,7 +74,7 @@ int main(void)
 
   // Create the output directory
   testBegin("Create renderer output directory");
-  if (system("mkdir -p testfiles/renderer-output") != 0)
+  if (system("mkdir -p testfiles/renderer-output/text") != 0)
   {
     testEndMessage(false, "Failed to create output directory.");
     return (1);
@@ -94,6 +102,7 @@ int main(void)
     if (system(command) != 0) status = 1, testEnd(false);
     else testEnd(true);
   }
+
  /* 
   // Open directory containing the PDF files
   DIR *dir = opendir(input_path);

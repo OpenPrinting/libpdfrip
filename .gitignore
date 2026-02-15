@@ -5,4 +5,5 @@ pdf2cairo/*.o
 testpdf2cairo
 testfiles/renderer-output/
 testfiles/testpdfio
+testfiles/test-codes/
 source/tools/pdf2cairo/pdf2cairo

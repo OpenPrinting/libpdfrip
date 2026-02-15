@@ -6,24 +6,24 @@
 // information.
 //
 
+#ifndef CAIRO_DEVICE_PRIVATE_H
+#define CAIRO_DEVICE_PRIVATE_H
 
-#ifndef CAIRO_DEVICE_H
-#define CAIRO_DEVICE_H
-
+#include "../pdf/parser.h"
 #include <cairo/cairo.h>
 #include <pdfio.h>
-#include "../pdf/parser.h"
 #include <ft2build.h>
 
 typedef struct cairo_device_s p2c_device_t;
+typedef struct pdfrip_page_s pdfrip_page_t;
+typedef struct operand_s operand_t;
 	
 void device_transform(p2c_device_t *dev, double a, double b, double c, double d, double e, double f);
 
 // --- Device Lifecycle ---
-p2c_device_t *device_create(pdfio_rect_t mediabox, int dpi);
+p2c_device_t *device_create(pdfrip_page_t *page, int dpi);
 void device_destroy(p2c_device_t *dev);
 void device_save_to_png(p2c_device_t *dev, const char *filename);
-void device_set_resources(p2c_device_t *dev, pdfio_dict_t *res_dict);
 
 // --- Graphice State Management ---
 void device_save_state(p2c_device_t *dev);
@@ -64,8 +64,7 @@ void device_next_line(p2c_device_t *dev);
 void device_set_text_matrix(p2c_device_t *dev, double a, double b, double c, double d, double e, double f);
 void device_set_font(p2c_device_t *dev, const char *font_name, double size);
 void device_show_text(p2c_device_t *dev, const char *str);
-void device_show_text_kerning(p2c_device_t *dev, operand_t  *operands, int num_operands);
+void device_show_text_kerning(p2c_device_t *dev, operand_t *operands, int num_operands);
 void device_set_text_rendering_mode(p2c_device_t *dev, int mode);
-void device_set_page(p2c_device_t *dev, pdfio_obj_t *page);
 void device_get_current_point(p2c_device_t *dev, double *x, double *y);
-#endif 
+#endif // CAIRO_DEVICE_PRIVATE_H

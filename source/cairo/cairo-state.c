@@ -6,7 +6,7 @@
 // information.
 //
 
-#include "cairo_device_internal.h"
+#include "cairo-private.h"
 
 // 
 // 'cmyk_to_rgb()' - Converts CMYK color values to RGB.

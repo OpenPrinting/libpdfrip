@@ -6,7 +6,7 @@
 // information.
 //
 
-#include "cairo_device_internal.h"
+#include "cairo-private.h"
 
 // --- Device LifeCycle Functions ---
 
@@ -17,7 +17,7 @@
 //
 
 p2c_device_t*				  // O - pointer to initialized cairo structure
-device_create(pdfio_rect_t mediabox, 	// I - physical dimensions(co-ords) of PDF page
+device_create(pdfrip_page_t *page, 	// I - Data related to PDF page
 	      int dpi)			// I - target resolution for output image(DPI)
 {
   // Allocate memory for the device structure and zero it out
@@ -33,11 +33,14 @@ device_create(pdfio_rect_t mediabox, 	// I - physical dimensions(co-ords) of PDF
   double scale = dpi / 72.0;
 
   // Determine pixel dimensions from the PDF MediaBox and scale
-  double width = (mediabox.x2 - mediabox.x1) * scale;
-  double height = (mediabox.y2 - mediabox.y1) * scale;
+  double width = (page->mediaBox.x2 - page->mediaBox.x1) * scale;
+  double height = (page->mediaBox.y2 - page->mediaBox.y1) * scale;
 
   if (g_verbose)
     printf("DEBUG: Creating Cairo surface: %.2fx%.2f pixels (scale: %.2f)\n", width, height, scale);
+
+  // set Null values to 
+  dev->num_fonts = 0;
 
   // Create the underlying Cairo image surface and context
   dev->surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, (int)width, (int)height);
@@ -53,7 +56,7 @@ device_create(pdfio_rect_t mediabox, 	// I - physical dimensions(co-ords) of PDF
   cairo_scale(dev->cr, scale, scale);
 
   // Flip Y axis (PDF 0,0 is bottom-left, Cairo is top-left)
-  cairo_translate(dev->cr, 0, mediabox.y2 - mediabox.y1); 
+  cairo_translate(dev->cr, 0, page->mediaBox.y2 - page->mediaBox.y1); 
   cairo_scale(dev->cr, 1.0, -1.0); 
 
 
@@ -103,43 +106,20 @@ device_destroy(p2c_device_t *dev)	// I - pointer to structure to be freed
     cairo_destroy(dev->cr);
     cairo_surface_destroy(dev->surface);
 
+    // Thinking that each page might have different font thingy, so freeing it for now
+    // But if error occur, will look into this.
+    for (size_t i = 0; i < dev->num_fonts; i++) 
+    {
+      // Free the raw data and the Cairo face for the previous page
+      free(dev->fonts[i]->data);
+      cairo_font_face_destroy(dev->fonts[i]->cairo_face);
+      free(dev->fonts[i]);
+    }
+    dev->num_fonts = 0;
+
     // Final step: free the device structure itself
     free(dev);
   }
-}
-
-// 
-// 'device_set_resources()' - Associates page-level resource dictionaries with the device
-//
-
-void 						  // O - Void
-device_set_resources(p2c_device_t *dev, 	// I - active Rendering context
-		     pdfio_dict_t *res_dict)	// I - resource dictionary of page
-{
-  if (g_verbose)
-    printf("DEBUG: Setting page resources for the device.\n");
-
-  // Retrieve the dictionary from the provided PDF resource object
-  if (!res_dict)
-  {
-    // If no dictionary exists, clear internal pointers and return
-    dev->font_dict = NULL;
-    dev->xobject_dict = NULL;
-    return;
-  }
-
-  // Locate the /Font dictionary within resources and store its reference
-  pdfio_obj_t *font_res_obj = pdfioDictGetObj(res_dict, "Font");
-  dev->font_dict = font_res_obj ? pdfioObjGetDict(font_res_obj) : NULL;
-  if (g_verbose && dev->font_dict)
-    printf("DEBUG: Found /Font resource dictionary.\n");
-
-  // Locate the /XObject dictionary and store its reference
-  pdfio_obj_t *xobject_res_obj = pdfioDictGetObj(res_dict, "XObject");
-  dev->xobject_dict = xobject_res_obj ? pdfioObjGetDict(xobject_res_obj) : NULL;
-  
-  if (g_verbose && dev->xobject_dict)
-    printf("DEBUG: Found /XObject resource dictionary.\n");
 }
 
 //
@@ -159,16 +139,4 @@ device_save_to_png(p2c_device_t *dev, 		// I - Active Rendering context
     // Report an error if the surface cannot be written
     fprintf(stderr, "ERROR: Unable to write PNG to '%s'.\n", filename);
   }
-}
-
-//
-// 'device_set_page' - Sets the active PDF page object for the device.
-//
-
-void 					  // O - Void
-device_set_page(p2c_device_t *dev, 	// I - Active Rendering Context
-	 	pdfio_obj_t *page)	// I - Page object currently being renderered
-{
-  // Store the pointer to the PDF page object in the device structure
-  dev->page = page;
 }

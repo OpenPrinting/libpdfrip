@@ -1,14 +1,25 @@
-# Programs
-CC = gcc
-RM = rm -f
+#
+# Makefile for libpdfrip
+#
+# Copyright 2025-2026 Uddhav Phatak
+#
+# Licensed under Apache License v2.0.  See the file "LICENSE" for more
+# information.
+#
 
-# --- Flags ---
-# -I adds directories to the include path so the compiler can find headers
-# source/pdf             -> for pdfops-private.h
-# source/cairo           -> for cairo_device.h
-# source/tools/pdf2cairo -> for parser.h
+# POSIX makefile
+.POSIX:
+
+
+# Build silently
+.SILENT:
+
+
+# Programs and options
+CC      = gcc
+RM      = rm -f
+
 CFLAGS   = -g -Wall -Isource/pdf -Isource/cairo -Isource/tools/pdf2cairo
-LDFLAGS  =
 
 # --- pkg-config Dependencies ---
 PDFIO_CFLAGS   = $(shell pkg-config --cflags pdfio)
@@ -26,10 +37,10 @@ BUILD_LIBS   = $(LDFLAGS) $(PDFIO_LIBS) $(CAIRO_LIBS)
 SRCS_TOOL  = source/tools/pdf2cairo/pdf2cairo.c 
 
 # 2. The Cairo Backend (in source/cairo)
-SRCS_CAIRO = source/cairo/cairo_device.c \
-             source/cairo/cairo_path.c \
-             source/cairo/cairo_state.c \
-             source/cairo/cairo_text.c
+SRCS_CAIRO = source/cairo/cairo-device.c \
+             source/cairo/cairo-path.c \
+             source/cairo/cairo-state.c \
+             source/cairo/cairo-text.c
 
 # 3. The PDF Operations (in source/pdf)
 SRCS_PDF   = source/pdf/pdfops.c \
@@ -44,24 +55,40 @@ BIN  = source/tools/pdf2cairo/pdf2cairo
 
 # --- Targets ---
 
-.PHONY: all clean
+.PHONY: all clean test valgrind
 
 all: $(BIN)
-	@echo "Build complete. Executable: $(BIN)"
 
+# Link the final binary
 $(BIN): $(OBJS)
-	@echo "Linking $@"
-	$(CC) -o $@ $(OBJS) $(BUILD_LIBS)
+	@echo Linking $@...
+	$(CC) $(BUILD_CFLAGS) -o $@ $(OBJS) $(BUILD_LIBS)
 
-# Generic rule for compiling C files to Object files
-%.o: %.c
-	@echo "Compiling $<..."
+# Compile source files into object files
+.SUFFIXES: .c .o
+.c.o:
+	@echo Compiling $<...
 	$(CC) $(BUILD_CFLAGS) -c -o $@ $<
 
-test: testpdf2cairo.c
-	$(CC) $(BUILD_CFLAGS) testpdf2cairo.c -o testpdf2cairo $(BUILD_LIBS)
+# Run the test suite
+test: testpdf2cairo
+	@echo Running tests...
 	./testpdf2cairo
 
+# Build the test runner
+testpdf2cairo: testpdf2cairo.o $(filter-out source/tools/pdf2cairo/pdf2cairo.o, $(OBJS))
+	@echo Linking $@...
+	$(CC) $(BUILD_CFLAGS) -o $@ testpdf2cairo.o $(filter-out source/tools/pdf2cairo/pdf2cairo.o, $(OBJS)) $(BUILD_LIBS)
+
+# Run under Valgrind to detect the segfaults and leaks
+valgrind: testpdf2cairo
+	valgrind --leak-check=full ./testpdf2cairo
+
+# Clean build files
 clean:
-	@echo "Cleaning build files..."
-	$(RM) $(OBJS) $(BIN)
+	@echo Cleaning build files...
+	$(RM) $(BIN) $(OBJS) testpdf2cairo testpdf2cairo.o
+
+# --- Dependencies (Manual Header Tracking) ---
+$(OBJS): source/pdf/pdfops-private.h source/cairo/cairo-private.h source/pdf/parser.h
+testpdf2cairo.o: testpdf2cairo.c test.h

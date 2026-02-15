@@ -91,12 +91,13 @@ freePDFdoc(pdfrip_doc_t *PDF_data)	// I - ripPDF doc
 //
 
 pdfrip_page_t* 				  // O - Page data structure
-getPageData(pdfio_file_t *pdf,		// I - PDF file
+getPageData(pdfrip_doc_t *pdf_doc,	// I - PDF file
 	    size_t page_number)		// I - Page number ( 0-based index)
 {
   pdfrip_page_t *page = (pdfrip_page_t*)malloc(sizeof(pdfrip_page_t));
 
-  page->object = pdfioFileGetPage(pdf, page_number);
+  page->parent_doc = pdf_doc;
+  page->object = pdfioFileGetPage(pdf_doc->pdf, page_number);
   page->object_dict = pdfioObjGetDict(page->object);
   page->resources_dict = pdfioDictGetDict(page->object_dict, "Resources");
 

@@ -13,7 +13,7 @@
 
 #include "pdfops-private.h"
 #include "../pdf/parser.h"
-#include "../cairo/cairo_device.h"
+#include "../cairo/cairo-private.h"
 
 int g_verbose = 0;
 
@@ -48,10 +48,10 @@ main(int argc, 		// I - Number of command-line args
   pdfrip_doc_t 		*PDF_doc;		// PDF meta data structure
 						
   // Command-line options
-  char 			*input_filename = NULL;	// input PDF filename	
-  char 			*output_filename = NULL; // output filename
+  char 			*input_filename = NULL;		// input PDF filename	
+  char 			*output_filename = NULL; 	// output filename
   int 			pagenum = 1;
-  size_t 		i;			// iterator
+  size_t 		cur_page;			// page iterator
   int 			dpi = 72;
   int analyze_mode = 0;
   int opt;
@@ -173,20 +173,62 @@ main(int argc, 		// I - Number of command-line args
       return (1);
     }
   }
- 
 
   //pdf FIle processing
   PDF_doc = openPDFfile(input_filename);	
 
-  for(i=0; i<PDF_doc->num_pages ; i++)
+  for(cur_page=0; cur_page<PDF_doc->num_pages ; cur_page++)
   {
-    pdfrip_page_t *page = getPageData(PDF_doc->pdf, i); 
+    pdfrip_page_t *page = getPageData(PDF_doc, cur_page); 
     
-    p2c_device_t *dev = device_create(page->mediaBox, dpi);
+    p2c_device_t *dev = device_create(page, dpi);
     if (dev)
     {
-      device_set_page(dev, page->object);
-      
+      // this sets the current page being worked upon into the context(dev will act as context)
+      dev->page = page->object;
+
+      if(!page->resources_dict)
+      { 
+	fprintf(stderr, "ERROR: PDF file is not correct, No Resource dictionary");
+        device_destroy(dev);
+        freePageData(page);
+        freePDFdoc(PDF_doc);
+	return 1;
+      }
+
+      // Load the font glyphs to dev
+      dev->font_dict = pdfioDictGetDict(page->resources_dict, "Font");
+      if(!dev->font_dict)
+      {
+	//TODO: set a default
+        fprintf(stderr, "No font dictionary in Resources dict\n");
+      }
+      else
+      {
+        dev->num_fonts = pdfioDictGetNumPairs(dev->font_dict);
+	dev->fonts = (p2c_font_t**)calloc(dev->num_fonts, sizeof(p2c_font_t*));
+
+	for (size_t i = 0; i < dev->num_fonts; i++)
+	{
+  	  // Allocate each individual font structure
+  	  dev->fonts[i] = (p2c_font_t *)calloc(1, sizeof(p2c_font_t));
+       	}
+
+	if(!getPageFonts(dev, cur_page))
+	{
+	  fprintf(stderr, "ERROR: Could not extract Font Glyphs\n");
+          device_destroy(dev);
+	  freePageData(page);
+	  freePDFdoc(PDF_doc);
+	  return 1;
+	}
+      }
+      fprintf(stderr, "+++++++++++++++++++++++%ld++++++++\n",dev->num_fonts);
+
+      // Locate the /XObject dictionary and store its reference
+      pdfio_obj_t *xobject_res_obj = pdfioDictGetObj(page->resources_dict, "XObject");
+      dev->xobject_dict = xobject_res_obj ? pdfioObjGetDict(xobject_res_obj) : NULL;
+
       process_content_stream(dev, page);
       device_save_to_png(dev, output_filename);
       device_destroy(dev);

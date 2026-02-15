@@ -6,10 +6,10 @@
 // information.
 //
 
-#ifndef CAIRO_DEVICE_INTERNAL_H
-#define CAIRO_DEVICE_INTERNAL_H
+#ifndef CAIRO_INTERNAL_H
+#define CAIRO_INTERNAL_H
 
-#include "cairo_device.h"
+#include "cairo-device-private.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,6 +28,15 @@ typedef enum
   CS_DEVICE_RGB,
   CS_DEVICE_CMYK,
 } p2c_colorspace_t;
+
+typedef struct p2c_font_s
+{
+  char		*ref_font_name;		// PDF font reference Name
+  char      	*name;         		// Original Font Name
+  uint8_t   	*data;         		// data
+  size_t    	data_size;     		// size of data
+  cairo_font_face_t *cairo_face; 	// The face created for Cairo
+} p2c_font_t;
 
 // Our internal graphics state structure
 typedef struct
@@ -58,9 +67,13 @@ struct cairo_device_s
   cairo_t 	  	*cr;
   graphics_state_t 	gstack[MAX_GSTATE];
   int 			gstack_ptr;
+  // font context
   pdfio_dict_t 		*font_dict;
+  p2c_font_t        	**fonts;    // Array of extracted font structures
+  size_t            	num_fonts;
+  // TODO: For XOBJECTS
   pdfio_dict_t 		*xobject_dict;
   pdfio_obj_t 		*page;
 };
 
-#endif // CAIRO_DEVICE_INTERNAL_H
+#endif // CAIRO_INTERNAL_H
