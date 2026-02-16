@@ -46,6 +46,6 @@ pdfrip_page_t* getPageData(pdfrip_doc_t *pdf_doc, size_t page_number); // get Pa
 void freePageData(pdfrip_page_t *page);
 
 // Text helper functions
-bool getPageFonts(p2c_device_t *dev, size_t cur_page);
+bool getPageFonts(p2c_device_t *dev);
 void load_encoding(pdfio_obj_t *page_obj, const char *name, int encoding[256]);
 #endif //PDFOPS_PRIVATE_H

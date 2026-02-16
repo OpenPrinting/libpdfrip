@@ -1203,17 +1203,45 @@ load_encoding(
   }
 }
 
+
 //
 // 'getPageFonts()' - Get Font Glyphs
 //
 
 bool 					  // O - 1 on error, 0 on success	
-getPageFonts(p2c_device_t *dev, 	// I - PDF2Cairo Conversion document
-	     size_t cur_page)		// I - Current Page Number
+getPageFonts(p2c_device_t *dev) 	// I - PDF2Cairo Conversion document
 {
   for(size_t cur_font=0; cur_font < dev->num_fonts; cur_font++) 
   {
-     
+    const char *font_key = pdfioDictGetKey(dev->font_dict, cur_font);
+    pdfio_obj_t *ref_font_obj = pdfioDictGetObj(dev->font_dict, font_key);
+    pdfio_dict_t *ref_font_dict = pdfioObjGetDict(ref_font_obj);
+
+    // Get the Reference Font name, 
+    // Real font name for backup(in case of failure)
+    // and the Encoding type.
+    dev->fonts[cur_font]->ref_font_name = pdfioDictGetName(ref_font_dict, "Name");
+    dev->fonts[cur_font]->font_name = pdfioDictGetName(ref_font_dict, "BaseFont");
+    dev->fonts[cur_font]->encoding = pdfioDictGetName(ref_font_dict, "Encoding");
+
+    // Get Starting char of Array
+    // Get Last char of Array
+    // Get the Width Array, this is the amount of space given to each character.
+    dev->fonts[cur_font]->first_char = (int)pdfioDictGetNumber(ref_font_dict, "FirstChar");
+    dev->fonts[cur_font]->last_char = (int)pdfioDictGetNumber(ref_font_dict, "LastChar");
+    pdfio_obj_t *width_object = pdfioDictGetObj(ref_font_dict, "Widths");
+    pdfio_array_t *width_array = pdfioObjGetArray(width_object);
+    if(width_array)
+    {
+      fprintf(stderr, "No Width Array");
+      return false;
+    }
+    size_t width_array_size = pdfioArrayGetSize(width_array);
+    dev->fonts[cur_font]->widths = calloc(width_array_size, sizeof(double));
+    for (size_t i = 0; i < width_array_size; i++)
+    {
+      dev->fonts[cur_font]->widths[i] = pdfioArrayGetNumber(width_array, i);
+    }
   }
   return true;
 }	

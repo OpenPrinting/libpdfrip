@@ -214,7 +214,7 @@ main(int argc, 		// I - Number of command-line args
   	  dev->fonts[i] = (p2c_font_t *)calloc(1, sizeof(p2c_font_t));
        	}
 
-	if(!getPageFonts(dev, cur_page))
+	if(!getPageFonts(dev))
 	{
 	  fprintf(stderr, "ERROR: Could not extract Font Glyphs\n");
           device_destroy(dev);

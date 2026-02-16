@@ -29,15 +29,6 @@ typedef enum
   CS_DEVICE_CMYK,
 } p2c_colorspace_t;
 
-typedef struct p2c_font_s
-{
-  char		*ref_font_name;		// PDF font reference Name
-  char      	*name;         		// Original Font Name
-  uint8_t   	*data;         		// data
-  size_t    	data_size;     		// size of data
-  cairo_font_face_t *cairo_face; 	// The face created for Cairo
-} p2c_font_t;
-
 // Our internal graphics state structure
 typedef struct
 {
@@ -59,6 +50,22 @@ typedef struct
   p2c_colorspace_t fill_colorspace;
   p2c_colorspace_t stroke_colorspace;
 } graphics_state_t;
+
+typedef struct p2c_font_s
+{
+  const char	*ref_font_name;		// PDF font reference Name e.g. "F1"
+  const char   	*font_name;    		// Original Font Name e.g. "BCDEEE+Calibri"
+  const char	*encoding;		// Encoding type.
+  uint8_t   	*data;         		// Font Binary data
+  size_t    	data_size;     		// size of data
+					
+  int           first_char;       	// starting CID/GID
+  int           last_char;        	// ending CID/GID
+  double        *widths;           	// Extract from the /Widths array
+
+  cairo_font_face_t *cairo_face; 	// The face created for Cairo
+} p2c_font_t;
+
 
 // The complete device structure definition
 struct cairo_device_s
