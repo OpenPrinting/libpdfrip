@@ -1231,7 +1231,7 @@ getPageFonts(p2c_device_t *dev) 	// I - PDF2Cairo Conversion document
     dev->fonts[cur_font]->last_char = (int)pdfioDictGetNumber(ref_font_dict, "LastChar");
     pdfio_obj_t *width_object = pdfioDictGetObj(ref_font_dict, "Widths");
     pdfio_array_t *width_array = pdfioObjGetArray(width_object);
-    if(width_array)
+    if(!width_array)
     {
       fprintf(stderr, "No Width Array");
       return false;
