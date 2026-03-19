@@ -67,4 +67,10 @@ void device_show_text(p2c_device_t *dev, const char *str);
 void device_show_text_kerning(p2c_device_t *dev, operand_t *operands, int num_operands);
 void device_set_text_rendering_mode(p2c_device_t *dev, int mode);
 void device_get_current_point(p2c_device_t *dev, double *x, double *y);
+
+// --- Image/XObject Rendering ---
+void device_draw_image(p2c_device_t *dev, pdfio_obj_t *xobj);
+
+
+
 #endif // CAIRO_DEVICE_PRIVATE_H

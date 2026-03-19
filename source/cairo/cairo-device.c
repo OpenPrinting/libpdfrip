@@ -7,6 +7,121 @@
 //
 
 #include "cairo-private.h"
+#include <jpeglib.h>
+#include <setjmp.h>
+
+typedef struct p2c_jpeg_error_s
+{
+  struct jpeg_error_mgr pub;
+  jmp_buf               jmp;
+} p2c_jpeg_error_t;
+
+static cairo_user_data_key_t p2c_surface_data_key;
+
+static void
+p2c_jpeg_error_exit(j_common_ptr cinfo)
+{
+  p2c_jpeg_error_t *error = (p2c_jpeg_error_t *)cinfo->err;
+
+  (*cinfo->err->output_message)(cinfo);
+  longjmp(error->jmp, 1);
+}
+
+static cairo_surface_t *
+decode_jpeg_surface(const unsigned char *data, size_t length)
+{
+  struct jpeg_decompress_struct cinfo;
+  p2c_jpeg_error_t              jerr;
+  cairo_surface_t               *surface = NULL;
+  unsigned char                 *surface_data = NULL;
+  JSAMPLE                       *buffer = NULL;
+  int                           stride;
+  int                           width, height, components;
+
+  cinfo.err             = jpeg_std_error(&jerr.pub);
+  jerr.pub.error_exit   = p2c_jpeg_error_exit;
+
+  if (setjmp(jerr.jmp))
+  {
+    jpeg_destroy_decompress(&cinfo);
+    free(buffer);
+    free(surface_data);
+    return (NULL);
+  }
+
+  jpeg_create_decompress(&cinfo);
+  jpeg_mem_src(&cinfo, (unsigned char *)data, length);
+  jpeg_read_header(&cinfo, TRUE);
+  jpeg_start_decompress(&cinfo);
+
+  width      = (int)cinfo.output_width;
+  height     = (int)cinfo.output_height;
+  components = cinfo.output_components;
+  stride     = cairo_format_stride_for_width(CAIRO_FORMAT_RGB24, width);
+
+  surface_data = calloc((size_t)stride, cinfo.output_height);
+  buffer = malloc((size_t)cinfo.output_width * cinfo.output_components);
+  if (!surface_data)
+  {
+    jpeg_destroy_decompress(&cinfo);
+    return (NULL);
+  }
+  else if (!buffer)
+  {
+    jpeg_destroy_decompress(&cinfo);
+    free(surface_data);
+    return (NULL);
+  }
+
+  while (cinfo.output_scanline < cinfo.output_height)
+  {
+    JSAMPROW  row = surface_data + (size_t)stride * cinfo.output_scanline;
+    JSAMPROW  src = buffer;
+
+    jpeg_read_scanlines(&cinfo, &src, 1);
+
+    for (JDIMENSION x = 0; x < cinfo.output_width; x ++)
+    {
+      unsigned char *dst = row + x * 4;
+
+      if (components == 3)
+      {
+        dst[0] = buffer[x * 3 + 2];
+        dst[1] = buffer[x * 3 + 1];
+        dst[2] = buffer[x * 3 + 0];
+      }
+      else if (components == 1)
+      {
+        dst[0] = buffer[x];
+        dst[1] = buffer[x];
+        dst[2] = buffer[x];
+      }
+
+      dst[3] = 255;
+    }
+  }
+
+  jpeg_finish_decompress(&cinfo);
+  jpeg_destroy_decompress(&cinfo);
+  free(buffer);
+
+  surface = cairo_image_surface_create_for_data(surface_data,
+                                                CAIRO_FORMAT_RGB24,
+                                                width,
+                                                height,
+                                                stride);
+  if (cairo_surface_status(surface) != CAIRO_STATUS_SUCCESS)
+  {
+    free(surface_data);
+    cairo_surface_destroy(surface);
+    return (NULL);
+  }
+
+  cairo_surface_set_user_data(surface, &p2c_surface_data_key, surface_data, free);
+  cairo_surface_mark_dirty(surface);
+
+  return (surface);
+}
 
 // --- Device LifeCycle Functions ---
 
@@ -88,6 +203,118 @@ device_create(pdfrip_page_t *page, 	// I - Data related to PDF page
   cairo_paint(dev->cr);
 
   return (dev);
+}
+
+#include <cairo.h>
+#include <pdfio.h>
+
+void device_draw_image(p2c_device_t *dev, pdfio_obj_t *xobj)
+{
+  pdfio_dict_t	*dict = pdfioObjGetDict(xobj);
+  pdfio_stream_t	*stream;
+  unsigned char	*data = NULL;
+  size_t	length = 0, capacity = 0;
+
+  int width  = (int)pdfioDictGetNumber(dict, "Width");
+  int height = (int)pdfioDictGetNumber(dict, "Height");
+  int bpc    = (int)pdfioDictGetNumber(dict, "BitsPerComponent");
+
+  const char *colorspace = pdfioDictGetName(dict, "ColorSpace");
+  const char *filter     = pdfioDictGetName(dict, "Filter");
+
+  fprintf(stderr, "DEBUG: Image %dx%d, bpc=%d, cs=%s, filter=%s\n",
+          width, height, bpc, colorspace ? colorspace : "NULL",
+          filter ? filter : "NONE");
+
+  stream = pdfioObjOpenStream(xobj, !(filter && !strcmp(filter, "DCTDecode")));
+  if (!stream)
+  {
+    fprintf(stderr, "ERROR: Cannot open image stream\n");
+    return;
+  }
+
+  for (;;)
+  {
+    unsigned char	buffer[8192];
+    ssize_t	bytes = pdfioStreamRead(stream, buffer, sizeof(buffer));
+
+    if (bytes < 0)
+    {
+      fprintf(stderr, "ERROR: Cannot read image stream\n");
+      free(data);
+      pdfioStreamClose(stream);
+      return;
+    }
+
+    if (bytes == 0)
+      break;
+
+    if (length + (size_t)bytes > capacity)
+    {
+      size_t		new_capacity = capacity ? capacity * 2 : 8192;
+      unsigned char	*temp;
+
+      while (new_capacity < length + (size_t)bytes)
+        new_capacity *= 2;
+
+      temp = realloc(data, new_capacity);
+      if (!temp)
+      {
+        fprintf(stderr, "ERROR: Out of memory reading image stream\n");
+        free(data);
+        pdfioStreamClose(stream);
+        return;
+      }
+
+      data     = temp;
+      capacity = new_capacity;
+    }
+
+    memcpy(data + length, buffer, (size_t)bytes);
+    length += (size_t)bytes;
+  }
+
+  pdfioStreamClose(stream);
+
+  fprintf(stderr, "DEBUG: Got %zu bytes\n", length);
+
+  // Temporary debug path for raw JPEG image data.
+  if (filter && !strcmp(filter, "DCTDecode"))
+  {
+    cairo_surface_t *image;
+    FILE *f = fopen("debug.jpg", "wb");
+    if (f)
+    {
+      fwrite(data, 1, length, f);
+      fclose(f);
+      fprintf(stderr, "DEBUG: Saved image as debug.jpg\n");
+    }
+
+    image = decode_jpeg_surface(data, length);
+    if (!image)
+    {
+      fprintf(stderr, "ERROR: Unable to decode JPEG image\n");
+      free(data);
+      return;
+    }
+
+    cairo_save(dev->cr);
+    cairo_translate(dev->cr, 0.0, 1.0);
+    cairo_scale(dev->cr, 1.0, -1.0);
+    cairo_scale(dev->cr, 1.0 / width, 1.0 / height);
+    cairo_set_source_surface(dev->cr, image, 0.0, 0.0);
+    cairo_pattern_set_filter(cairo_get_source(dev->cr), CAIRO_FILTER_BEST);
+    cairo_rectangle(dev->cr, 0.0, 0.0, width, height);
+    cairo_fill(dev->cr);
+    cairo_restore(dev->cr);
+
+    cairo_surface_destroy(image);
+    free(data);
+    return;
+  }
+
+  fprintf(stderr, "WARNING: Unsupported image format\n");
+  free(data);
 }
 
 //

@@ -575,6 +575,70 @@ handle_Tr(p2c_device_t *dev,
   }
 }
 
+void process_form_xobject(p2c_device_t *dev, pdfio_obj_t *xobj)
+{
+  pdfio_dict_t *dict = pdfioObjGetDict(xobj);
+
+  pdfio_stream_t *st = pdfioObjOpenStream(xobj, true);
+
+  pdfrip_page_t fake_page = {
+    .object = xobj,
+    .resources_dict = pdfioDictGetDict(dict, "Resources"),
+    .num_streams = 1
+  };
+
+  process_content_stream(dev, &fake_page);
+
+  pdfioStreamClose(st);
+}
+
+static void 
+handle_Do(p2c_device_t *dev, pdfio_dict_t *resources)
+{
+  if (operand_stack_ptr == 1 && 
+      operand_stack[0].type == OP_TYPE_NAME)
+  {
+    const char *name = operand_stack[0].value.name + 1;
+
+    if (g_verbose)
+      fprintf(stderr, "DEBUG: Operator Do (XObject): %s\n", name);
+
+    pdfio_dict_t *xobject_dict = pdfioDictGetDict(resources, "XObject");
+    if (!xobject_dict)
+    {
+      fprintf(stderr, "ERROR: No XObject dictionary\n");
+      return;
+    }
+
+    pdfio_obj_t *xobj = pdfioDictGetObj(xobject_dict, name);
+    if (!xobj)
+    {
+      fprintf(stderr, "ERROR: XObject %s not found\n", name);
+      return;
+    }
+
+    pdfio_dict_t *dict = pdfioObjGetDict(xobj);
+    const char *subtype = pdfioDictGetName(dict, "Subtype");
+
+    if (!subtype)
+    {
+      fprintf(stderr, "ERROR: Missing subtype\n");
+      return;
+    }
+
+    if (!strcmp(subtype, "Image"))
+    {
+      fprintf(stderr, "DEBUG: Rendering Image XObject\n");
+      device_draw_image(dev, xobj);
+    }
+    else if (!strcmp(subtype, "Form"))
+    {
+      fprintf(stderr, "DEBUG: Rendering Form XObject\n");
+      process_form_xobject(dev, xobj);
+    }
+  }
+}
+
 // --- Dispatch Table and Logic ---
 
 // type for our handler functions
@@ -595,6 +659,7 @@ static const pdf_operator_t operator_table[] =
   {"B*", 	handle_B_star},
   {"BT", 	handle_BT},
   {"CS", 	handle_CS},
+  {"Do", 	handle_Do},
   {"ET", 	handle_ET},
   {"G", 	handle_G},
   {"K", 	handle_K},
@@ -645,6 +710,29 @@ compare_operators(const void *a,
   return strcmp(token, op->name);
 }
 
+static pdfio_stream_t *
+reopen_page_stream_at_token(pdfio_obj_t *page, size_t stream_index, size_t token_count)
+{
+  pdfio_stream_t *st = pdfioPageOpenStream(page, stream_index, true);
+  char           token[1024];
+
+  if (!st)
+    return (NULL);
+
+  while (token_count > 0)
+  {
+    if (!pdfioStreamGetToken(st, token, sizeof(token)))
+    {
+      pdfioStreamClose(st);
+      return (NULL);
+    }
+
+    token_count --;
+  }
+
+  return (st);
+}
+
 void 
 process_content_stream(p2c_device_t *dev, 
 		       pdfrip_page_t *page_data)
@@ -657,8 +745,12 @@ process_content_stream(p2c_device_t *dev,
   for(size_t i=0; i<page_data->num_streams; i++)
   {
     pdfio_stream_t *st = pdfioPageOpenStream(page_data->object, i, true);
+    size_t         token_count = 0;
+
     while (pdfioStreamGetToken(st, token, sizeof(token)))
     { 
+      token_count ++;
+
       //fprintf(stderr, "DEBUG: Token: '%s'\n", token);
       if (isdigit(token[0]) || token[0] == '-' || token[0] == '+' || token[0] == '.')
       {
@@ -717,19 +809,39 @@ process_content_stream(p2c_device_t *dev,
         //fprintf(stderr, "hello DEBUG: Token: '%s'\n", token);
         const pdf_operator_t *op = bsearch(token, operator_table, operator_table_size, sizeof(pdf_operator_t), compare_operators);
 
-        if (op) 
-	{
-          op->handler(dev, page_data->resources_dict);
-       	} 
-	else 
-	{
+        if (op)
+        {
+          if (!strcmp(token, "Do"))
+          {
+            pdfioStreamClose(st);
+            st = NULL;
+
+            op->handler(dev, page_data->resources_dict);
+
+            st = reopen_page_stream_at_token(page_data->object, i, token_count);
+            if (!st)
+            {
+              fprintf(stderr, "ERROR: Unable to resume page content stream after Do\n");
+              return;
+            }
+          }
+          else
+          {
+            op->handler(dev, page_data->resources_dict);
+          }
+        }
+        else 
+        {
           if (g_verbose) 
  	    printf("DEBUG: Unhandled operator: %s\n", token);
-       	}
+        }
 
         // Clear the operand stack for the next command
         operand_stack_ptr = 0;
       }
     }
+
+    if (st)
+      pdfioStreamClose(st);
   }
 }

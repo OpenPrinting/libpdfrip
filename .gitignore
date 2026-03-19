@@ -7,3 +7,8 @@ testfiles/renderer-output/
 testfiles/testpdfio
 testfiles/test-codes/
 source/tools/pdf2cairo/pdf2cairo
+
+out.png
+out.jpg
+debug.jpg
+debug.png
