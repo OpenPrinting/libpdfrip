@@ -1204,6 +1204,7 @@ load_encoding(
 }
 
 
+/*
 //
 // 'getPageFonts()' - Get Font Glyphs
 //
@@ -1214,7 +1215,9 @@ getPageFonts(p2c_device_t *dev) 	// I - PDF2Cairo Conversion document
   for(size_t cur_font=0; cur_font < dev->num_fonts; cur_font++) 
   {
     const char *font_key = pdfioDictGetKey(dev->font_dict, cur_font);
+    fprintf(stderr, "the font name is %s\n", font_key);
     pdfio_obj_t *ref_font_obj = pdfioDictGetObj(dev->font_dict, font_key);
+    fprintf(stderr, "the font object number is %ld", pdfioObjGetNumber(ref_font_obj));
     pdfio_dict_t *ref_font_dict = pdfioObjGetDict(ref_font_obj);
 
     // Get the Reference Font name, 
@@ -1233,7 +1236,7 @@ getPageFonts(p2c_device_t *dev) 	// I - PDF2Cairo Conversion document
     pdfio_array_t *width_array = pdfioObjGetArray(width_object);
     if(width_array)
     {
-      fprintf(stderr, "No Width Array");
+      fprintf(stderr, "No Width Array\n");
       return false;
     }
     size_t width_array_size = pdfioArrayGetSize(width_array);
@@ -1245,3 +1248,165 @@ getPageFonts(p2c_device_t *dev) 	// I - PDF2Cairo Conversion document
   }
   return true;
 }	
+*/
+
+//
+// 'getPageFonts()' - Get Font Glyphs and build TrueType faces safely
+//
+
+bool 					  
+getPageFonts(p2c_device_t *dev) 	
+{
+  if (!dev || !dev->font_dict)
+    return true; 
+
+  dev->num_fonts = pdfioDictGetNumPairs(dev->font_dict);
+  if (dev->num_fonts == 0)
+    return true;
+
+  dev->fonts = calloc(dev->num_fonts, sizeof(p2c_font_t *));
+  if (!dev->fonts)
+    return false;
+
+  // Initialize FreeType as a static instance 
+  static FT_Library ft_library = NULL;
+  static bool ft_initialized = false;
+  if (!ft_initialized)
+  {
+    if (FT_Init_FreeType(&ft_library) != 0)
+    {
+      fprintf(stderr, "ERROR: Could not initialize FreeType library.\n");
+      return false;
+    }
+    ft_initialized = true;
+  }
+
+  for(size_t cur_font=0; cur_font < dev->num_fonts; cur_font++) 
+  {
+    const char *font_key = pdfioDictGetKey(dev->font_dict, cur_font);
+    if (!font_key)
+      continue;
+
+    dev->fonts[cur_font] = calloc(1, sizeof(p2c_font_t));
+    if (!dev->fonts[cur_font])
+      continue;
+
+    pdfio_obj_t *ref_font_obj = pdfioDictGetObj(dev->font_dict, font_key);
+    pdfio_dict_t *ref_font_dict = pdfioObjGetDict(ref_font_obj);
+    if (!ref_font_dict)
+      continue;
+
+    // Use dictionary key (e.g. "F1") as the reference name, 
+    dev->fonts[cur_font]->ref_font_name = font_key; 
+    dev->fonts[cur_font]->font_name = pdfioDictGetName(ref_font_dict, "BaseFont");
+    dev->fonts[cur_font]->encoding = pdfioDictGetName(ref_font_dict, "Encoding");
+
+    dev->fonts[cur_font]->first_char = (int)pdfioDictGetNumber(ref_font_dict, "FirstChar");
+    dev->fonts[cur_font]->last_char = (int)pdfioDictGetNumber(ref_font_dict, "LastChar");
+    
+    load_encoding(dev->page_obj, font_key, dev->fonts[cur_font]->encoding_table);
+
+    pdfio_obj_t *width_object = pdfioDictGetObj(ref_font_dict, "Widths");
+    pdfio_array_t *width_array = pdfioObjGetArray(width_object);
+    if (width_array)
+    {
+      size_t width_array_size = pdfioArrayGetSize(width_array);
+      dev->fonts[cur_font]->widths = calloc(width_array_size, sizeof(double));
+      if (dev->fonts[cur_font]->widths)
+      {
+        for (size_t i = 0; i < width_array_size; i++)
+          dev->fonts[cur_font]->widths[i] = pdfioArrayGetNumber(width_array, i);
+      }
+    }
+
+    pdfio_dict_t *descriptor_dict = pdfioDictGetDict(ref_font_dict, "FontDescriptor");
+    pdfio_obj_t *font_file_obj = NULL;
+
+    if (descriptor_dict)
+    {
+      font_file_obj = pdfioDictGetObj(descriptor_dict, "FontFile2");
+      if (!font_file_obj)
+        font_file_obj = pdfioDictGetObj(descriptor_dict, "FontFile");
+    }
+
+    int ft_error = -1;
+    FT_Face ft_face = NULL;
+
+    if (font_file_obj)
+    {
+      pdfio_stream_t *st = pdfioObjOpenStream(font_file_obj, true);
+      if (st)
+      {
+        size_t capacity = 64 * 1024;
+        size_t total_bytes = 0;
+        unsigned char *buffer = malloc(capacity);
+
+        if (buffer)
+        {
+          ssize_t bytes_read;
+          unsigned char read_buf[4096];
+
+          while ((bytes_read = pdfioStreamRead(st, read_buf, sizeof(read_buf))) > 0)
+          {
+            if (total_bytes + bytes_read > capacity)
+            {
+              capacity *= 2;
+              unsigned char *new_buffer = realloc(buffer, capacity);
+              if (!new_buffer)
+              {
+                free(buffer);
+                buffer = NULL;
+                break;
+              }
+              buffer = new_buffer;
+            }
+            memcpy(buffer + total_bytes, read_buf, bytes_read);
+            total_bytes += bytes_read;
+          }
+
+          if (buffer && total_bytes > 0)
+          {
+            dev->fonts[cur_font]->data = buffer;
+            dev->fonts[cur_font]->data_size = total_bytes;
+
+            ft_error = FT_New_Memory_Face(ft_library, 
+                                          dev->fonts[cur_font]->data, 
+                                          (FT_Long)total_bytes, 
+                                          0, 
+                                          &ft_face);
+          }
+          else if (buffer)
+          {
+            free(buffer);
+          }
+        }
+        pdfioStreamClose(st);
+      }
+    }
+
+    if (ft_error != 0 || !ft_face)
+    {
+      const char *fallback_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+      ft_error = FT_New_Face(ft_library, fallback_path, 0, &ft_face);
+      
+      if (ft_error != 0)
+        continue;
+    }
+
+    dev->fonts[cur_font]->ft_face = ft_face;
+
+    cairo_font_face_t *cairo_face = cairo_ft_font_face_create_for_ft_face(ft_face, 0);
+    if (cairo_font_face_status(cairo_face) != CAIRO_STATUS_SUCCESS)
+    {
+      FT_Done_Face(ft_face);
+      continue;
+    }
+
+    static const cairo_user_data_key_t cleanup_key;
+    cairo_font_face_set_user_data(cairo_face, &cleanup_key, ft_face, (cairo_destroy_func_t)FT_Done_Face);
+
+    dev->fonts[cur_font]->cairo_face = cairo_face;
+  }
+
+  return true;
+}

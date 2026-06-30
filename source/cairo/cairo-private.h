@@ -10,11 +10,14 @@
 #define CAIRO_INTERNAL_H
 
 #include "cairo-device-private.h"
+#include <cairo/cairo-ft.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <ft2build.h>
+#include FT_FREETYPE_H
 
 // Global verbose flag (declared in main)
 extern int g_verbose;
@@ -30,7 +33,7 @@ typedef enum
 } p2c_colorspace_t;
 
 // Our internal graphics state structure
-typedef struct
+typedef struct graphics_state_s
 {
   double 	fill_rgb[3];
   double 	stroke_rgb[3];
@@ -63,6 +66,9 @@ typedef struct p2c_font_s
   int           last_char;        	// ending CID/GID
   double        *widths;           	// Extract from the /Widths array
 
+  int           encoding_table[256];
+
+  FT_Face       ft_face;            	// Active FreeType face object initialized from 'data'
   cairo_font_face_t *cairo_face; 	// The face created for Cairo
 } p2c_font_t;
 
@@ -74,13 +80,15 @@ struct cairo_device_s
   cairo_t 	  	*cr;
   graphics_state_t 	gstack[MAX_GSTATE];
   int 			gstack_ptr;
+
   // font context
   pdfio_dict_t 		*font_dict;
   p2c_font_t        	**fonts;    // Array of extracted font structures
   size_t            	num_fonts;
+
   // TODO: For XOBJECTS
   pdfio_dict_t 		*xobject_dict;
-  pdfio_obj_t 		*page;
+  pdfio_obj_t 		*page_obj;
 };
 
 #endif // CAIRO_INTERNAL_H

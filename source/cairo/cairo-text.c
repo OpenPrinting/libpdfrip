@@ -66,37 +66,47 @@ device_set_font(p2c_device_t *dev,
 {
   graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
 
-  // Map PDF font names to standard Cairo families (using strings)
-  const char *family = "Sans";
-  cairo_font_slant_t slant = CAIRO_FONT_SLANT_NORMAL;
-  cairo_font_weight_t weight = CAIRO_FONT_WEIGHT_NORMAL;
+  gs->font_size = font_size;
+  // Safely copy the font name to the graphics state
+  strncpy(gs->font_name, font_name, sizeof(gs->font_name) - 1);
+  gs->font_name[sizeof(gs->font_name) - 1] = '\0';
 
-  // Simple heuristic to pick the font family
-  if (strstr(font_name, "Times") || 
-       strstr(font_name, "Serif") || 
-        strstr(font_name, "Roman")) 
+  // Find the loaded font in our extracted device fonts array
+  p2c_font_t *active_font = NULL;
+  for (size_t i = 0; i < dev->num_fonts; i++) 
   {
-    family = "Serif";
-  } 
-  else if (strstr(font_name, "Courier") || 
-	    strstr(font_name, "Mono") || 
-	     strstr(font_name, "Typewriter")) 
-  {
-    family = "Monospace";
+    // Match the requested PDF resource name (e.g., "F1") with the parsed font
+    if (dev->fonts[i] && dev->fonts[i]->ref_font_name && 
+        strcmp(dev->fonts[i]->ref_font_name, font_name) == 0) 
+    {
+      active_font = dev->fonts[i];
+      break;
+    }
   }
 
-  if (strstr(font_name, "Bold")) 
-    weight = CAIRO_FONT_WEIGHT_BOLD;
-  if (strstr(font_name, "Italic") || strstr(font_name, "Oblique")) 
-    slant = CAIRO_FONT_SLANT_ITALIC;
+  // Apply the true embedded FreeType font face to the Cairo context
+  if (active_font && active_font->cairo_face) 
+  {
+    if (g_verbose)
+      fprintf(stderr, "DEBUG: Applying embedded font face: %s\n", font_name);
+      
+    cairo_set_font_face(dev->cr, active_font->cairo_face);
+  } 
+  else 
+  {
+    if (g_verbose)
+      fprintf(stderr, "DEBUG: Font %s not found, falling back to basic Sans.\n", font_name);
+      
+    cairo_select_font_face(dev->cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  }
 
-  // Select the font using strings
-  cairo_select_font_face(dev->cr, family, slant, weight);
   cairo_set_font_size(dev->cr, font_size);
-  gs->font_size = font_size;
 
-  // We pass dev->page because pdf2text's load_encoding expects a page object to find resources.
-  load_encoding(dev->page, font_name, gs->encoding);
+  // Load the encoding table for this specific font
+  // (NOTE: Using dev->page_obj instead of dev->page based on our previous header fixes!)
+  if (dev->page_obj) {
+      load_encoding(dev->page_obj, font_name, gs->encoding);
+  }
 }
 
 static void 

@@ -123,6 +123,7 @@ main(int argc, 		// I - Number of command-line args
     print_usage(argv[0]);
     return (1);
   }
+
   // --- Filename and Argument Validation for Render Mode ---
   if (!analyze_mode)
   {
@@ -185,7 +186,7 @@ main(int argc, 		// I - Number of command-line args
     if (dev)
     {
       // this sets the current page being worked upon into the context(dev will act as context)
-      dev->page = page->object;
+      dev->page_obj = page->object;
 
       if(!page->resources_dict)
       { 
