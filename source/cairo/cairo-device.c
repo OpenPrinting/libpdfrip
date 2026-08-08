@@ -79,48 +79,87 @@ device_create(pdfrip_page_t *page,
 }
 
 //
+// 'p2c_font_destroy()' - destroy the Font Glyphs
+//
+
+void
+p2c_font_destroy(p2c_font_t *font)
+{
+  if (!font)
+    return;
+
+  if (font->cairo_face)
+  {
+    cairo_font_face_destroy(font->cairo_face);
+    font->cairo_face = NULL;
+    font->ft_face = NULL;
+  }
+  else if (font->ft_face)
+  {
+    FT_Done_Face(font->ft_face);
+    font->ft_face = NULL;
+  }
+
+  free(font->data);
+  free(font->widths);
+  free(font);
+}
+
+//
+// 'device_clear_fonts()' - free the font structures
+//
+
+void
+device_clear_fonts(p2c_device_t *dev)
+{
+  if (!dev || !dev->fonts)
+    return;
+
+  /*
+   * cairo_face owns ft_face through Cairo user data.
+   * Destroy it before freeing font->data because an
+   * FT_Memory_Face depends on that data.
+   */
+
+  for (size_t i = 0; i < dev->num_fonts; i++)
+    p2c_font_destroy(dev->fonts[i]);
+
+  free(dev->fonts);
+
+  dev->fonts = NULL;
+  dev->num_fonts = 0;
+}
+
+//
 // 'device_destroy()' - frees all allocated resources safely
 //
 
 void 					  
 device_destroy(p2c_device_t *dev)	
 {
-  if (dev)
+  if (!dev)
+    return;
+
+  /*
+   * Destroy Cairo context first because it may retain
+   * a reference to the selected Cairo font face.
+   */
+  if (dev->cr)
   {
-    if (g_verbose)
-      printf("DEBUG: Destroying Cairo device.\n");
-
     cairo_destroy(dev->cr);
-    cairo_surface_destroy(dev->surface);
-
-    if (dev->fonts) 
-    {
-      for (size_t i = 0; i < dev->num_fonts; i++) 
-      {
-        if (dev->fonts[i]) 
-        {
-          if (dev->fonts[i]->data)
-            free(dev->fonts[i]->data);
-          
-          if (dev->fonts[i]->widths)
-            free(dev->fonts[i]->widths);
-
-          if (dev->fonts[i]->cairo_face)
-            cairo_font_face_destroy(dev->fonts[i]->cairo_face);
-          
-          free(dev->fonts[i]);
-        }
-      }
-      free(dev->fonts);
-    }
-    
-    dev->num_fonts = 0;
-    dev->fonts = NULL;
-
-    free(dev);
+    dev->cr = NULL;
   }
-}
+  
+  device_clear_fonts(dev);
+  
+  if (dev->surface)
+  {
+    cairo_surface_destroy(dev->surface);
+    dev->surface = NULL;
+  }
 
+  free(dev);
+}
 
 //
 // 'device_save_to_png()' - Saves the current rendered surface to a PNG file
@@ -140,3 +179,5 @@ device_save_to_png(p2c_device_t *dev, 		// I - Active Rendering context
     fprintf(stderr, "ERROR: Unable to write PNG to '%s'.\n", filename);
   }
 }
+
+

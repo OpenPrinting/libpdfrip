@@ -1260,6 +1260,13 @@ getPageFonts(p2c_device_t *dev)
   if (!dev || !dev->font_dict)
     return true; 
 
+  /* Prevent accidental second initialization. */
+  if (dev->fonts)
+  {
+    fprintf(stderr, "ERROR: Fonts are already loaded.\n");
+    return false;
+  }
+
   dev->num_fonts = pdfioDictGetNumPairs(dev->font_dict);
   if (dev->num_fonts == 0)
     return true;
@@ -1283,6 +1290,13 @@ getPageFonts(p2c_device_t *dev)
 
   for(size_t cur_font=0; cur_font < dev->num_fonts; cur_font++) 
   {
+    dev->fonts[cur_font] = calloc(1, sizeof(*dev->fonts[cur_font]));
+    if (!dev->fonts[cur_font])
+    {
+      device_clear_fonts(dev);
+      return false;
+    }
+
     const char *font_key = pdfioDictGetKey(dev->font_dict, cur_font);
     if (!font_key)
       continue;
@@ -1308,14 +1322,24 @@ getPageFonts(p2c_device_t *dev)
 
     pdfio_obj_t *width_object = pdfioDictGetObj(ref_font_dict, "Widths");
     pdfio_array_t *width_array = pdfioObjGetArray(width_object);
-    if (!width_array)
+
+    if (width_array)
     {
       size_t width_array_size = pdfioArrayGetSize(width_array);
-      dev->fonts[cur_font]->widths = calloc(width_array_size, sizeof(double));
-      if (dev->fonts[cur_font]->widths)
+      if (width_array_size > 0)
       {
-        for (size_t i = 0; i < width_array_size; i++)
-          dev->fonts[cur_font]->widths[i] = pdfioArrayGetNumber(width_array, i);
+	dev->fonts[cur_font]->widths = calloc(width_array_size, sizeof(*dev->fonts[cur_font]->widths));
+	
+	if(!dev->fonts[cur_font]->widths)
+ 	{
+	  device_clear_fonts(dev);
+      	  return false;
+	}
+
+	dev->fonts[cur_font]->num_widths = width_array_size;
+
+	for (size_t width_array_index = 0; width_array_index < width_array_size; width_array_index++)
+          dev->fonts[cur_font]->widths[width_array_index] = pdfioArrayGetNumber(width_array, width_array_index);
       }
     }
 

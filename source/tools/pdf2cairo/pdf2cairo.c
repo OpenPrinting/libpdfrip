@@ -212,15 +212,6 @@ main(int argc, 		// I - Number of command-line args
         else if(font_structure == PDFIO_VALTYPE_DICT)
 	   dev->font_dict = pdfioDictGetDict(page->resources_dict, "Font");
 
-        dev->num_fonts = pdfioDictGetNumPairs(dev->font_dict);
-	dev->fonts = (p2c_font_t**)calloc(dev->num_fonts, sizeof(p2c_font_t*));
-
-	for (size_t i = 0; i < dev->num_fonts; i++)
-	{
-  	  // Allocate each individual font structure
-  	  dev->fonts[i] = (p2c_font_t *)calloc(1, sizeof(p2c_font_t));
-       	}
-
 	if(!getPageFonts(dev))
 	{
 	  fprintf(stderr, "ERROR: Could not extract Font Glyphs\n");
