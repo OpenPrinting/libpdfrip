@@ -199,13 +199,19 @@ main(int argc, 		// I - Number of command-line args
 
       // Load the font glyphs to dev
       dev->font_dict = pdfioDictGetDict(page->resources_dict, "Font");
-      if(!dev->font_dict)
+      pdfio_valtype_t font_structure = pdfioDictGetType(page->resources_dict, "Font");
+      if(!font_structure)
       {
 	//TODO: set a default
         fprintf(stderr, "No font dictionary in Resources dict\n");
       }
       else
       {
+        if(font_structure == PDFIO_VALTYPE_INDIRECT)
+	   dev->font_dict = pdfioObjGetDict(pdfioDictGetObj(page->resources_dict, "Font"));
+        else if(font_structure == PDFIO_VALTYPE_DICT)
+	   dev->font_dict = pdfioDictGetDict(page->resources_dict, "Font");
+
         dev->num_fonts = pdfioDictGetNumPairs(dev->font_dict);
 	dev->fonts = (p2c_font_t**)calloc(dev->num_fonts, sizeof(p2c_font_t*));
 

@@ -1308,7 +1308,7 @@ getPageFonts(p2c_device_t *dev)
 
     pdfio_obj_t *width_object = pdfioDictGetObj(ref_font_dict, "Widths");
     pdfio_array_t *width_array = pdfioObjGetArray(width_object);
-    if (width_array)
+    if (!width_array)
     {
       size_t width_array_size = pdfioArrayGetSize(width_array);
       dev->fonts[cur_font]->widths = calloc(width_array_size, sizeof(double));

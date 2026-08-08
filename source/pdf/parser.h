@@ -36,6 +36,21 @@ typedef struct operand_s
   } value;
 } operand_t;
 
+// Context required while parsing the Content stream
+typedef struct parser_context_s
+{
+  p2c_device_t *device;
+  pdfrip_page_t *page_data;
+  pdfio_dict_t *resources;
+
+  operand_t *operands;
+  size_t num_operands;
+  size_t operand_capacity;
+
+  char *token;
+  size_t token_capacity;
+} parser_context_t;
+
 
 /**
  * @brief Processes a PDF content stream and uses a device to render it

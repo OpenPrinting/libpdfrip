@@ -18,6 +18,7 @@
 # Programs and options
 CC      = gcc
 RM      = rm -f
+MKDIR   = mkdir -p
 
 CFLAGS   = -g -Wall -Isource/pdf -Isource/cairo -Isource/tools/pdf2cairo
 
@@ -49,7 +50,9 @@ SRCS_PDF   = source/pdf/pdfops.c \
 
 # Combine all sources
 SRCS = $(SRCS_TOOL) $(SRCS_CAIRO) $(SRCS_PDF)
-OBJS = $(SRCS:.c=.o)
+BUILD_DIR = build
+OBJS = $(SRCS:%.c=$(BUILD_DIR)/%.o)
+TEST_OBJ = $(BUILD_DIR)/testpdf2cairo.o
 BIN  = source/tools/pdf2cairo/pdf2cairo
 
 
@@ -64,10 +67,10 @@ $(BIN): $(OBJS)
 	@echo Linking $@...
 	$(CC) $(BUILD_CFLAGS) -o $@ $(OBJS) $(BUILD_LIBS)
 
-# Compile source files into object files
-.SUFFIXES: .c .o
-.c.o:
+# Compile source files into the build directory
+$(BUILD_DIR)/%.o: %.c
 	@echo Compiling $<...
+	$(MKDIR) $(@D)
 	$(CC) $(BUILD_CFLAGS) -c -o $@ $<
 
 # Run the test suite
@@ -76,9 +79,9 @@ test: testpdf2cairo
 	./testpdf2cairo
 
 # Build the test runner
-testpdf2cairo: testpdf2cairo.o $(filter-out source/tools/pdf2cairo/pdf2cairo.o, $(OBJS))
+testpdf2cairo: $(TEST_OBJ) $(filter-out $(BUILD_DIR)/source/tools/pdf2cairo/pdf2cairo.o, $(OBJS))
 	@echo Linking $@...
-	$(CC) $(BUILD_CFLAGS) -o $@ testpdf2cairo.o $(filter-out source/tools/pdf2cairo/pdf2cairo.o, $(OBJS)) $(BUILD_LIBS)
+	$(CC) $(BUILD_CFLAGS) -o $@ $(TEST_OBJ) $(filter-out $(BUILD_DIR)/source/tools/pdf2cairo/pdf2cairo.o, $(OBJS)) $(BUILD_LIBS)
 
 # Run under Valgrind to detect the segfaults and leaks
 valgrind: testpdf2cairo
@@ -87,8 +90,10 @@ valgrind: testpdf2cairo
 # Clean build files
 clean:
 	@echo Cleaning build files...
-	$(RM) $(BIN) $(OBJS) testpdf2cairo testpdf2cairo.o
+	$(RM) $(BIN) testpdf2cairo
+	rm -rf build
 
 # --- Dependencies (Manual Header Tracking) ---
 $(OBJS): source/pdf/pdfops-private.h source/cairo/cairo-private.h source/pdf/parser.h
-testpdf2cairo.o: testpdf2cairo.c test.h
+$(TEST_OBJ): testpdf2cairo.c test.h
+
