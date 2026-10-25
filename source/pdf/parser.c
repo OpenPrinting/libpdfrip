@@ -117,6 +117,67 @@ parser_parse_number(const char *token, double *number)
   return end != token && *end == '\0';
 }
 
+static int
+parser_hex_value(int ch)
+{
+  if (ch >= '0' && ch <= '9')
+    return ch - '0';
+  else if (ch >= 'a' && ch <= 'f')
+    return ch - 'a' + 10;
+  else if (ch >= 'A' && ch <= 'F')
+    return ch - 'A' + 10;
+  else
+    return -1;
+}
+
+//
+// 'parser_decode_string()' - Convert a PDFio string token to raw bytes.
+//
+// PDFio returns literal strings as "(" followed by the already-unescaped
+// bytes (the closing parenthesis is NOT included), and hex strings as "<"
+// followed by the hex digits (the closing '>' is NOT included).
+//
+
+static size_t
+parser_decode_string(const char *token, unsigned char *out, size_t outsize)
+{
+  size_t len = 0;
+
+  if (token[0] == '(')
+  {
+    len = strlen(token + 1);
+    if (len > outsize)
+      len = outsize;
+    memcpy(out, token + 1, len);
+  }
+  else
+  {
+    int hi = -1;
+
+    for (const char *p = token + 1; *p && len < outsize; p ++)
+    {
+      int v = parser_hex_value(*p);
+
+      if (v < 0)
+        continue;
+
+      if (hi < 0)
+        hi = v;
+      else
+      {
+        out[len ++] = (unsigned char)((hi << 4) | v);
+        hi = -1;
+      }
+    }
+
+    // An odd number of digits means the final digit is followed by an implicit 0
+    if (hi >= 0 && len < outsize)
+      out[len ++] = (unsigned char)(hi << 4);
+  }
+
+  return len;
+}
+
 // --- Operator Handler Functions ---
 // Each function handles the logic for a single PDF operator.
 
@@ -228,11 +289,77 @@ handle_Tj(parser_context_t *ctx)
        ctx->operands[0].type == OP_TYPE_STRING) 
   {
     if (g_verbose) 
-      fprintf(stderr, "DEBUG: Operator Tj (Show Text) with string \"%s\"\n", 
-	       ctx->operands[0].value.string);
+      fprintf(stderr, "DEBUG: Operator Tj (Show Text) with %zu byte string\n", 
+	       ctx->operands[0].length);
 
-    device_show_text(ctx->device, ctx->operands[0].value.string);
+    device_show_text(ctx->device, ctx->operands[0].value.string,
+                     ctx->operands[0].length);
   }
+}
+
+static void
+handle_quote(parser_context_t *ctx)
+{
+  // string ' == T* string Tj
+  if (ctx->num_operands == 1 &&
+       ctx->operands[0].type == OP_TYPE_STRING)
+  {
+    device_next_line(ctx->device);
+    device_show_text(ctx->device, ctx->operands[0].value.string,
+                     ctx->operands[0].length);
+  }
+}
+
+static void
+handle_dquote(parser_context_t *ctx)
+{
+  // aw ac string " == aw Tw ac Tc string '
+  if (ctx->num_operands == 3 &&
+       ctx->operands[0].type == OP_TYPE_NUMBER &&
+        ctx->operands[1].type == OP_TYPE_NUMBER &&
+         ctx->operands[2].type == OP_TYPE_STRING)
+  {
+    device_set_word_spacing(ctx->device, ctx->operands[0].value.number);
+    device_set_char_spacing(ctx->device, ctx->operands[1].value.number);
+    device_next_line(ctx->device);
+    device_show_text(ctx->device, ctx->operands[2].value.string,
+                     ctx->operands[2].length);
+  }
+}
+
+static void
+handle_Tc(parser_context_t *ctx)
+{
+  if (parser_has_number_operands(ctx, 1))
+    device_set_char_spacing(ctx->device, ctx->operands[0].value.number);
+}
+
+static void
+handle_Tw(parser_context_t *ctx)
+{
+  if (parser_has_number_operands(ctx, 1))
+    device_set_word_spacing(ctx->device, ctx->operands[0].value.number);
+}
+
+static void
+handle_Tz(parser_context_t *ctx)
+{
+  if (parser_has_number_operands(ctx, 1))
+    device_set_horizontal_scaling(ctx->device, ctx->operands[0].value.number);
+}
+
+static void
+handle_TL(parser_context_t *ctx)
+{
+  if (parser_has_number_operands(ctx, 1))
+    device_set_text_leading(ctx->device, ctx->operands[0].value.number);
+}
+
+static void
+handle_Ts(parser_context_t *ctx)
+{
+  if (parser_has_number_operands(ctx, 1))
+    device_set_text_rise(ctx->device, ctx->operands[0].value.number);
 }
 
 static void 
@@ -646,6 +773,8 @@ typedef struct
 // IMPORTANT: This table MUST be sorted alphabetically by operator name for bsearch to work.
 static const pdf_operator_t operator_table[] = 
 {
+  {"\"", 	handle_dquote},
+  {"'", 	handle_quote},
   {"B", 	handle_B},
   {"B*", 	handle_B_star},
   {"BT", 	handle_BT},
@@ -659,11 +788,16 @@ static const pdf_operator_t operator_table[] =
   {"T*", 	handle_T_star},
   {"TD", 	handle_TD},
   {"TJ", 	handle_TJ},
+  {"TL", 	handle_TL},
+  {"Tc", 	handle_Tc},
   {"Td", 	handle_Td},
   {"Tf", 	handle_Tf},
   {"Tj", 	handle_Tj},
   {"Tm", 	handle_Tm},
   {"Tr", 	handle_Tr},
+  {"Ts", 	handle_Ts},
+  {"Tw", 	handle_Tw},
+  {"Tz", 	handle_Tz},
   {"W", 	handle_W},
   {"W*", 	handle_W_star},
   {"b", 	handle_b},
@@ -700,6 +834,26 @@ compare_operators(const void *a,
   return strcmp(token, op->name);
 }
 
+//
+// 'parser_preload_resources()' - Load resource objects used by operators
+//                                before any content stream is opened.
+//
+// PDFio streams read from the shared file position, so loading another
+// object while a content stream is open corrupts the rest of the stream.
+//
+
+static void
+parser_preload_resources(pdfio_dict_t *resources)
+{
+  pdfio_dict_t *ext_gstates = pdfioDictGetDict(resources, "ExtGState");
+
+  if (!ext_gstates)
+    ext_gstates = pdfioObjGetDict(pdfioDictGetObj(resources, "ExtGState"));
+
+  for (size_t i = 0; i < pdfioDictGetNumPairs(ext_gstates); i ++)
+    pdfioObjGetDict(pdfioDictGetObj(ext_gstates, pdfioDictGetKey(ext_gstates, i)));
+}
+
 void 
 process_content_stream(p2c_device_t *dev, 
 		       pdfrip_page_t *page_data)
@@ -718,6 +872,8 @@ process_content_stream(p2c_device_t *dev,
     fprintf(stderr, "ERROR: Unable to allocate the PDF parser context.\n");
     return;
   }
+
+  parser_preload_resources(page_data->resources_dict);
 
   for(size_t i=0; i<page_data->num_streams; i++)
   {
@@ -758,11 +914,9 @@ process_content_stream(p2c_device_t *dev,
         if (g_verbose)
           fprintf(stderr, "DEBUG: Pushed name: %s\n", operand->value.name);
       }
-      else if (token[0] == '(')
+      else if (token[0] == '(' || (token[0] == '<' && token[1] != '<'))
       {
         operand_t *operand = parser_push_operand(&ctx);
-        size_t token_length;
-        size_t string_length;
 
         if (!operand)
         {
@@ -771,21 +925,11 @@ process_content_stream(p2c_device_t *dev,
         }
 
         operand->type = OP_TYPE_STRING;
-        token_length = strlen(token);
-        string_length = token_length > 0 ? token_length - 1 : 0;
-
-        if (string_length > 0 && token[token_length - 1] == ')')
-          string_length --;
-
-        if (string_length >= sizeof(operand->value.string))
-          string_length = sizeof(operand->value.string) - 1;
-
-        memcpy(operand->value.string, token + 1, string_length);
-        operand->value.string[string_length] = '\0';
+        operand->length = parser_decode_string(token, operand->value.string,
+                                               sizeof(operand->value.string));
 
         if (g_verbose)
-          fprintf(stderr, "DEBUG: Pushed string: \"%s\"\n",
-                  operand->value.string);
+          fprintf(stderr, "DEBUG: Pushed %zu byte string\n", operand->length);
       }
       // Array delimiters are currently ignored. Their strings and numbers are
       // kept as consecutive operands for the existing TJ device interface.

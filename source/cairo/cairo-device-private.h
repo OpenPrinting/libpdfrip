@@ -63,8 +63,12 @@ void device_move_text_cursor(p2c_device_t *dev, double tx, double ty);
 void device_next_line(p2c_device_t *dev);
 void device_set_text_matrix(p2c_device_t *dev, double a, double b, double c, double d, double e, double f);
 void device_set_font(p2c_device_t *dev, const char *font_name, double size);
-void device_show_text(p2c_device_t *dev, const char *str);
+void device_show_text(p2c_device_t *dev, const unsigned char *str, size_t len);
 void device_show_text_kerning(p2c_device_t *dev, operand_t *operands, int num_operands);
 void device_set_text_rendering_mode(p2c_device_t *dev, int mode);
+void device_set_char_spacing(p2c_device_t *dev, double spacing);
+void device_set_word_spacing(p2c_device_t *dev, double spacing);
+void device_set_horizontal_scaling(p2c_device_t *dev, double percent);
+void device_set_text_rise(p2c_device_t *dev, double rise);
 void device_get_current_point(p2c_device_t *dev, double *x, double *y);
 #endif // CAIRO_DEVICE_PRIVATE_H

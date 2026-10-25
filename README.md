@@ -19,12 +19,14 @@ The following libraries and tools must be installed:
 * pkg-config
 * libpdfio (development headers)
 * cairo (development headers)
+* FreeType (development headers)
+* fontconfig (development headers)
 * libpng (development headers)
 
 ### Debian/Ubuntu Installation
 
 ```
-sudo apt-get install build-essential pkg-config libpdfio-dev libcairo2-dev libpng-dev
+sudo apt-get install build-essential pkg-config libpdfio-dev libcairo2-dev libfreetype-dev libfontconfig-dev libpng-dev
 ```
 
 ## Building

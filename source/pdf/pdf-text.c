@@ -5,6 +5,8 @@
 #include "pdfops-private.h"
 #include "../cairo/cairo-private.h"
 #include <string.h>
+#include <fontconfig/fontconfig.h>
+#include FT_FONT_FORMATS_H
 
 typedef struct name_map_s
 {
@@ -1067,101 +1069,192 @@ static name_map_t	unicode_map[] =
   { "zeta",		0x03b6 }
 };
 
-//
-// 'load_encoding()' - Load the encoding for a font.
-//
-
-void
-load_encoding(
-    pdfio_obj_t   *page_obj,		// I - Page object
-    const char    *name,		// I - Font name
-    int           encoding[256])	// O - Encoding table
+// WinANSI characters from 128 to 159
+static const int win_ansi[32] =
 {
-  size_t	i, j;			// Looping vars
-  pdfio_dict_t	*page_dict,		// Page dictionary
-		*resources_dict,	// Resources dictionary
-		*font_dict;		// Font dictionary
-  pdfio_obj_t	*font_obj,		// Font object
-		*encoding_obj;		// Encoding object
+  0x20AC, 0x0000, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021,
+  0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x0000, 0x017D, 0x0000,
+  0x0000, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
+  0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x0000, 0x017E, 0x0178
+};
+
+// MacRoman characters from 128 to 255
+static const int mac_roman[128] =
+{
+  0x00C4, 0x00C5, 0x00C7, 0x00C9, 0x00D1, 0x00D6, 0x00DC, 0x00E1,
+  0x00E0, 0x00E2, 0x00E4, 0x00E3, 0x00E5, 0x00E7, 0x00E9, 0x00E8,
+  0x00EA, 0x00EB, 0x00ED, 0x00EC, 0x00EE, 0x00EF, 0x00F1, 0x00F3,
+  0x00F2, 0x00F4, 0x00F6, 0x00F5, 0x00FA, 0x00F9, 0x00FB, 0x00FC,
+
+  0x2020, 0x00B0, 0x00A2, 0x00A3, 0x00A7, 0x2022, 0x00B6, 0x00DF,
+  0x00AE, 0x00A9, 0x2122, 0x00B4, 0x00A8, 0x2260, 0x00C6, 0x00D8,
+  0x221E, 0x00B1, 0x2264, 0x2265, 0x00A5, 0x00B5, 0x2202, 0x2211,
+  0x220F, 0x03C0, 0x222B, 0x00AA, 0x00BA, 0x03A9, 0x00E6, 0x00F8,
+
+  0x00BF, 0x00A1, 0x00AC, 0x221A, 0x0192, 0x2248, 0x2206, 0x00AB,
+  0x00BB, 0x2026, 0x00A0, 0x00C0, 0x00C3, 0x00D5, 0x0152, 0x0153,
+  0x2013, 0x2014, 0x201C, 0x201D, 0x2018, 0x2019, 0x00F7, 0x25CA,
+  0x00FF, 0x0178, 0x2044, 0x20AC, 0x2039, 0x203A, 0xFB01, 0xFB02,
+
+  0x2021, 0x00B7, 0x201A, 0x201E, 0x2030, 0x00C2, 0x00CA, 0x00C1,
+  0x00CB, 0x00C8, 0x00CD, 0x00CE, 0x00CF, 0x00CC, 0x00D3, 0x00D4,
+  0xF8FF, 0x00D2, 0x00DA, 0x00DB, 0x00D9, 0x0131, 0x02C6, 0x02DC,
+  0x00AF, 0x02D8, 0x02D9, 0x02DA, 0x00B8, 0x02DD, 0x02DB, 0x02C7
+};
+
+// StandardEncoding characters from 160 to 255 (ASCII below, except 0x27/0x60)
+static const int standard_high[96] =
+{
+  0x0000, 0x00A1, 0x00A2, 0x00A3, 0x2044, 0x00A5, 0x0192, 0x00A7,
+  0x00A4, 0x0027, 0x201C, 0x00AB, 0x2039, 0x203A, 0xFB01, 0xFB02,
+  0x0000, 0x2013, 0x2020, 0x2021, 0x00B7, 0x0000, 0x00B6, 0x2022,
+  0x201A, 0x201E, 0x201D, 0x00BB, 0x2026, 0x2030, 0x0000, 0x00BF,
+  0x0000, 0x0060, 0x00B4, 0x02C6, 0x02DC, 0x00AF, 0x02D8, 0x02D9,
+  0x00A8, 0x0000, 0x02DA, 0x00B8, 0x0000, 0x02DD, 0x02DB, 0x02C7,
+  0x2014, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
+  0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
+  0x0000, 0x00C6, 0x0000, 0x00AA, 0x0000, 0x0000, 0x0000, 0x0000,
+  0x0141, 0x00D8, 0x0152, 0x00BA, 0x0000, 0x0000, 0x0000, 0x0000,
+  0x0000, 0x00E6, 0x0000, 0x0000, 0x0000, 0x0131, 0x0000, 0x0000,
+  0x0142, 0x00F8, 0x0153, 0x00DF, 0x0000, 0x0000, 0x0000, 0x0000
+};
+
+//
+// 'dict_get_dict()' - Get a dictionary value, following an indirect reference.
+//
+// pdfioDictGetDict() only returns *direct* dictionaries, but values such as
+// /FontDescriptor are almost always indirect ("7 0 R").
+//
+
+static pdfio_dict_t *
+dict_get_dict(pdfio_dict_t *dict, const char *key)
+{
+  pdfio_dict_t *value = pdfioDictGetDict(dict, key);
+
+  return value ? value : pdfioObjGetDict(pdfioDictGetObj(dict, key));
+}
+
+//
+// 'dict_get_array()' - Get an array value, following an indirect reference.
+//
+
+static pdfio_array_t *
+dict_get_array(pdfio_dict_t *dict, const char *key)
+{
+  pdfio_array_t *value = pdfioDictGetArray(dict, key);
+
+  return value ? value : pdfioObjGetArray(pdfioDictGetObj(dict, key));
+}
+
+static pdfio_dict_t *
+array_get_dict(pdfio_array_t *array, size_t n)
+{
+  pdfio_dict_t *value = pdfioArrayGetDict(array, n);
+
+  return value ? value : pdfioObjGetDict(pdfioArrayGetObj(array, n));
+}
+
+static pdfio_array_t *
+array_get_array(pdfio_array_t *array, size_t n)
+{
+  pdfio_array_t *value = pdfioArrayGetArray(array, n);
+
+  return value ? value : pdfioObjGetArray(pdfioArrayGetObj(array, n));
+}
+
+//
+// 'glyph_name_to_unicode()' - Map a glyph name to Unicode (AGL + uniXXXX/uXXXX).
+//
+
+static int
+glyph_name_to_unicode(const char *name)
+{
+  char *end;
+  long value;
+
+  for (size_t j = 0; j < (sizeof(unicode_map) / sizeof(unicode_map[0])); j ++)
+  {
+    if (!strcmp(name, unicode_map[j].name))
+      return unicode_map[j].unicode;
+  }
+
+  if (!strncmp(name, "uni", 3) && strlen(name) >= 7)
+  {
+    value = strtol(name + 3, &end, 16);
+    if (end == name + 7)
+      return (int)value;
+  }
+  else if (name[0] == 'u' && strlen(name) >= 5 && strlen(name) <= 7)
+  {
+    value = strtol(name + 1, &end, 16);
+    if (*end == '\0')
+      return (int)value;
+  }
+
+  return 0;
+}
+
+//
+// 'load_encoding()' - Load the encoding for a simple font.
+//
+// Fills code -> Unicode and, for /Differences entries, code -> glyph name.
+// Returns true if the font dictionary has an /Encoding entry.
+//
+
+bool
+load_encoding(
+    pdfio_dict_t  *font_dict,		// I - Font dictionary
+    int           encoding[256],	// O - Code -> Unicode
+    const char    *names[256])		// O - Code -> glyph name (or NULL)
+{
+  size_t	i;			// Looping var
   pdfio_dict_t	*encoding_dict;		// Encoding dictionary
-  const char	*base_encoding;		// BaseEncoding name
+  const char	*base_encoding = NULL;	// Base encoding name
   pdfio_array_t	*differences;		// Differences array
-  static int	win_ansi[32] =		// WinANSI characters from 128 to 159
-  {
-    0x20AC, 0x0000, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021,
-    0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x0000, 0x017D, 0x0000,
-    0x0000, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
-    0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x0000, 0x017E, 0x0178
-  };
-  static int	mac_roman[128] =	// MacRoman characters from 128 to 255
-  {
-    0x00C4, 0x00C5, 0x00C7, 0x00C9, 0x00D1, 0x00D6, 0x00DC, 0x00E1,
-    0x00E0, 0x00E2, 0x00E4, 0x00E3, 0x00E5, 0x00E7, 0x00E9, 0x00E8,
-    0x00EA, 0x00EB, 0x00ED, 0x00EC, 0x00EE, 0x00EF, 0x00F1, 0x00F3,
-    0x00F2, 0x00F4, 0x00F6, 0x00F5, 0x00FA, 0x00F9, 0x00FB, 0x00FC,
-
-    0x2020, 0x00B0, 0x00A2, 0x00A3, 0x00A7, 0x2022, 0x00B6, 0x00DF,
-    0x00AE, 0x00A9, 0x2122, 0x00B4, 0x00A8, 0x2260, 0x00C6, 0x00D8,
-    0x221E, 0x00B1, 0x2264, 0x2265, 0x00A5, 0x00B5, 0x2202, 0x2211,
-    0x220F, 0x03C0, 0x222B, 0x00AA, 0x00BA, 0x03A9, 0x00E6, 0x00F8,
-
-    0x00BF, 0x00A1, 0x00AC, 0x221A, 0x0192, 0x2248, 0x2206, 0x00AB,
-    0x00BB, 0x2026, 0x00A0, 0x00C0, 0x00C3, 0x00D5, 0x0152, 0x0153,
-    0x2013, 0x2014, 0x201C, 0x201D, 0x2018, 0x2019, 0x00F7, 0x25CA,
-    0x00FF, 0x0178, 0x2044, 0x20AC, 0x2039, 0x203A, 0xFB01, 0xFB02,
-
-    0x2021, 0x00B7, 0x201A, 0x201E, 0x2030, 0x00C2, 0x00CA, 0x00C1,
-    0x00CB, 0x00C8, 0x00CD, 0x00CE, 0x00CF, 0x00CC, 0x00D3, 0x00D4,
-    0xF8FF, 0x00D2, 0x00DA, 0x00DB, 0x00D9, 0x0131, 0x02C6, 0x02DC,
-    0x00AF, 0x02D8, 0x02D9, 0x02DA, 0x00B8, 0x02DD, 0x02DB, 0x02C7
-  };
-  // TODO: Add MacExpert encoding...
+  pdfio_valtype_t type;			// Type of /Encoding
 
 
   // Initialize the encoding to be the "standard" WinAnsi...
   for (i = 0; i < 128; i ++)
-    encoding[i] = i;
+    encoding[i] = (int)i;
   for (i = 160; i < 256; i ++)
-    encoding[i] = i;
+    encoding[i] = (int)i;
   memcpy(encoding + 128, win_ansi, sizeof(win_ansi));
 
-  // Find the named font...
-  if ((page_dict = pdfioObjGetDict(page_obj)) == NULL)
-    return;
+  for (i = 0; i < 256; i ++)
+    names[i] = NULL;
 
-  if ((resources_dict = pdfioDictGetDict(page_dict, "Resources")) == NULL)
-    return;
+  // /Encoding may be a name, a direct dictionary or an indirect dictionary...
+  type = pdfioDictGetType(font_dict, "Encoding");
 
-  if ((font_dict = pdfioDictGetDict(resources_dict, "Font")) == NULL)
+  if (type == PDFIO_VALTYPE_NONE)
+    return (false);
+
+  if (type == PDFIO_VALTYPE_NAME)
   {
-    // Font resources not a dictionary, see if it is an object...
-    if ((font_obj = pdfioDictGetObj(resources_dict, "Font")) != NULL)
-      font_dict = pdfioObjGetDict(font_obj);
-
-    if (!font_dict)
-      return;
+    base_encoding = pdfioDictGetName(font_dict, "Encoding");
+    encoding_dict = NULL;
   }
-
-  if ((font_obj = pdfioDictGetObj(font_dict, name)) == NULL)
-    return;
-
-  if ((encoding_obj = pdfioDictGetObj(pdfioObjGetDict(font_obj), "Encoding")) == NULL)
-    return;
-
-  if ((encoding_dict = pdfioObjGetDict(encoding_obj)) == NULL)
-    return;
-
-  // OK, have the encoding object, build the encoding using it...
-  base_encoding = pdfioDictGetName(encoding_dict, "BaseEncoding");
-  differences   = pdfioDictGetArray(encoding_dict, "Differences");
+  else
+  {
+    encoding_dict = dict_get_dict(font_dict, "Encoding");
+    base_encoding = pdfioDictGetName(encoding_dict, "BaseEncoding");
+  }
 
   if (base_encoding && !strcmp(base_encoding, "MacRomanEncoding"))
   {
-    // Map upper 128
     memcpy(encoding + 128, mac_roman, sizeof(mac_roman));
   }
+  else if (base_encoding && !strcmp(base_encoding, "StandardEncoding"))
+  {
+    encoding[0x27] = 0x2019;
+    encoding[0x60] = 0x2018;
+    for (i = 128; i < 160; i ++)
+      encoding[i] = 0;
+    memcpy(encoding + 160, standard_high, sizeof(standard_high));
+  }
 
-  if (differences)
+  if ((differences = dict_get_array(encoding_dict, "Differences")) != NULL)
   {
     // Apply differences
     size_t	count = pdfioArrayGetSize(differences);
@@ -1180,18 +1273,12 @@ load_encoding(
 
         case PDFIO_VALTYPE_NAME :
             // Lookup name and apply to encoding...
-            if (idx < 0 || idx > 255)
+            if (idx > 255)
               break;
 
-            name = pdfioArrayGetName(differences, i);
-            for (j = 0; j < (sizeof(unicode_map) / sizeof(unicode_map[0])); j ++)
-            {
-              if (!strcmp(name, unicode_map[j].name))
-              {
-                encoding[idx] = unicode_map[j].unicode;
-                break;
-              }
-            }
+            name         = pdfioArrayGetName(differences, i);
+            names[idx]   = name;
+            encoding[idx] = glyph_name_to_unicode(name);
 	    idx ++;
             break;
 
@@ -1201,62 +1288,577 @@ load_encoding(
       }
     }
   }
+
+  return (true);
 }
 
-
-/*
 //
-// 'getPageFonts()' - Get Font Glyphs
+// 'read_stream()' - Read and decode a whole stream object into memory.
 //
 
-bool 					  // O - 1 on error, 0 on success	
-getPageFonts(p2c_device_t *dev) 	// I - PDF2Cairo Conversion document
+static uint8_t *
+read_stream(pdfio_obj_t *obj, size_t *size)
 {
-  for(size_t cur_font=0; cur_font < dev->num_fonts; cur_font++) 
+  pdfio_stream_t *st;
+  size_t	capacity = 64 * 1024, total = 0;
+  uint8_t	*buffer, *temp;
+  ssize_t	bytes;
+
+  *size = 0;
+
+  if (!obj || (st = pdfioObjOpenStream(obj, true)) == NULL)
+    return (NULL);
+
+  if ((buffer = malloc(capacity)) == NULL)
   {
-    const char *font_key = pdfioDictGetKey(dev->font_dict, cur_font);
-    fprintf(stderr, "the font name is %s\n", font_key);
-    pdfio_obj_t *ref_font_obj = pdfioDictGetObj(dev->font_dict, font_key);
-    fprintf(stderr, "the font object number is %ld", pdfioObjGetNumber(ref_font_obj));
-    pdfio_dict_t *ref_font_dict = pdfioObjGetDict(ref_font_obj);
+    pdfioStreamClose(st);
+    return (NULL);
+  }
 
-    // Get the Reference Font name, 
-    // Real font name for backup(in case of failure)
-    // and the Encoding type.
-    dev->fonts[cur_font]->ref_font_name = pdfioDictGetName(ref_font_dict, "Name");
-    dev->fonts[cur_font]->font_name = pdfioDictGetName(ref_font_dict, "BaseFont");
-    dev->fonts[cur_font]->encoding = pdfioDictGetName(ref_font_dict, "Encoding");
+  while ((bytes = pdfioStreamRead(st, buffer + total, capacity - total)) > 0)
+  {
+    total += (size_t)bytes;
 
-    // Get Starting char of Array
-    // Get Last char of Array
-    // Get the Width Array, this is the amount of space given to each character.
-    dev->fonts[cur_font]->first_char = (int)pdfioDictGetNumber(ref_font_dict, "FirstChar");
-    dev->fonts[cur_font]->last_char = (int)pdfioDictGetNumber(ref_font_dict, "LastChar");
-    pdfio_obj_t *width_object = pdfioDictGetObj(ref_font_dict, "Widths");
-    pdfio_array_t *width_array = pdfioObjGetArray(width_object);
-    if(width_array)
+    if (total == capacity)
     {
-      fprintf(stderr, "No Width Array\n");
-      return false;
-    }
-    size_t width_array_size = pdfioArrayGetSize(width_array);
-    dev->fonts[cur_font]->widths = calloc(width_array_size, sizeof(double));
-    for (size_t i = 0; i < width_array_size; i++)
-    {
-      dev->fonts[cur_font]->widths[i] = pdfioArrayGetNumber(width_array, i);
+      if ((temp = realloc(buffer, capacity * 2)) == NULL)
+      {
+        free(buffer);
+        pdfioStreamClose(st);
+        return (NULL);
+      }
+
+      buffer = temp;
+      capacity *= 2;
     }
   }
-  return true;
-}	
-*/
+
+  pdfioStreamClose(st);
+
+  if (total == 0)
+  {
+    free(buffer);
+    return (NULL);
+  }
+
+  *size = total;
+  return (buffer);
+}
+
+static FT_Library
+get_ft_library(void)
+{
+  static FT_Library ft_library = NULL;
+
+  if (!ft_library && FT_Init_FreeType(&ft_library) != 0)
+  {
+    fprintf(stderr, "ERROR: Could not initialize FreeType library.\n");
+    ft_library = NULL;
+  }
+
+  return (ft_library);
+}
 
 //
-// 'getPageFonts()' - Get Font Glyphs and build TrueType faces safely
+// 'load_embedded_face()' - Load the font program embedded in the PDF.
+//
+
+static FT_Face
+load_embedded_face(FT_Library lib, pdfio_dict_t *descriptor, p2c_font_t *font)
+{
+  // FontFile2 = TrueType, FontFile3 = CFF/OpenType, FontFile = Type 1
+  static const char * const keys[] = { "FontFile2", "FontFile3", "FontFile" };
+
+  for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i ++)
+  {
+    pdfio_obj_t	*obj = pdfioDictGetObj(descriptor, keys[i]);
+    uint8_t	*data;
+    size_t	size;
+    FT_Face	face;
+
+    if ((data = read_stream(obj, &size)) == NULL)
+      continue;
+
+    if (FT_New_Memory_Face(lib, data, (FT_Long)size, 0, &face) == 0)
+    {
+      font->data      = data;
+      font->data_size = size;
+      return (face);
+    }
+
+    fprintf(stderr, "WARNING: FreeType could not load /%s of font '%s'.\n",
+            keys[i], font->font_name ? font->font_name : "?");
+    free(data);
+  }
+
+  return (NULL);
+}
+
+//
+// 'load_system_face()' - Find a substitute for a non-embedded font with fontconfig.
+//
+
+static FT_Face
+load_system_face(FT_Library lib, const p2c_font_t *font)
+{
+  char		family[256] = "";
+  const char	*name = font->font_name, *plus, *style = "";
+  bool		bold = (font->flags & 0x40000) != 0,	// ForceBold
+		italic = (font->flags & 64) != 0,	// Italic
+		fixed = (font->flags & 1) != 0,		// FixedPitch
+		serif = (font->flags & 2) != 0;		// Serif
+  FcPattern	*pattern, *match;
+  FcResult	result;
+  FcChar8	*file = NULL;
+  int		index = 0;
+  FT_Face	face = NULL;
+  char		*sep;
+
+  if (name)
+  {
+    // Strip the subset tag, e.g. "BCDEEE+Calibri" -> "Calibri"
+    if ((plus = strchr(name, '+')) != NULL && plus - name == 6)
+      name = plus + 1;
+
+    snprintf(family, sizeof(family), "%s", name);
+
+    // "Family-Style" or "Family,Style"
+    if ((sep = strpbrk(family, "-,")) != NULL)
+    {
+      *sep = '\0';
+      style = name + (sep - family) + 1;
+    }
+
+    if (strstr(style, "Bold") || strstr(style, "Black") || strstr(style, "Heavy"))
+      bold = true;
+    if (strstr(style, "Italic") || strstr(style, "Oblique"))
+      italic = true;
+
+    // Standard 14 / common PostScript names -> names fontconfig aliases
+    if (!strncmp(family, "Times", 5))
+      strcpy(family, "Times");
+    else if (!strncmp(family, "Courier", 7))
+      strcpy(family, "Courier");
+    else if (!strcmp(family, "ZapfDingbats"))
+      strcpy(family, "Dingbats");
+  }
+
+  if ((pattern = FcPatternCreate()) == NULL)
+    return (NULL);
+
+  if (family[0])
+    FcPatternAddString(pattern, FC_FAMILY, (const FcChar8 *)family);
+  FcPatternAddString(pattern, FC_FAMILY,
+                     (const FcChar8 *)(fixed ? "monospace" : serif ? "serif" : "sans-serif"));
+  FcPatternAddInteger(pattern, FC_WEIGHT, bold ? FC_WEIGHT_BOLD : FC_WEIGHT_REGULAR);
+  FcPatternAddInteger(pattern, FC_SLANT, italic ? FC_SLANT_ITALIC : FC_SLANT_ROMAN);
+  FcPatternAddBool(pattern, FC_OUTLINE, FcTrue);
+
+  FcConfigSubstitute(NULL, pattern, FcMatchPattern);
+  FcDefaultSubstitute(pattern);
+
+  if ((match = FcFontMatch(NULL, pattern, &result)) != NULL)
+  {
+    if (FcPatternGetString(match, FC_FILE, 0, &file) == FcResultMatch)
+    {
+      FcPatternGetInteger(match, FC_INDEX, 0, &index);
+
+      if (FT_New_Face(lib, (const char *)file, index, &face) != 0)
+        face = NULL;
+      else if (g_verbose)
+        fprintf(stderr, "DEBUG: Substituting '%s' with '%s'.\n",
+                font->font_name ? font->font_name : "?", (const char *)file);
+    }
+
+    FcPatternDestroy(match);
+  }
+
+  FcPatternDestroy(pattern);
+
+  return (face);
+}
+
+static FT_CharMap
+find_charmap(FT_Face face, int platform_id, int encoding_id)
+{
+  for (int i = 0; i < face->num_charmaps; i ++)
+  {
+    if (face->charmaps[i]->platform_id == platform_id &&
+        (encoding_id < 0 || face->charmaps[i]->encoding_id == encoding_id))
+      return (face->charmaps[i]);
+  }
+
+  return (NULL);
+}
+
+static FT_UInt
+charmap_lookup(FT_Face face, FT_CharMap cmap, FT_ULong code)
+{
+  if (!cmap || !code || FT_Set_Charmap(face, cmap) != 0)
+    return (0);
+
+  return (FT_Get_Char_Index(face, code));
+}
+
+static int
+unicode_to_mac_roman(int unicode)
+{
+  if (unicode > 0 && unicode < 128)
+    return (unicode);
+
+  for (int i = 0; i < 128; i ++)
+  {
+    if (mac_roman[i] == unicode)
+      return (i + 128);
+  }
+
+  return (0);
+}
+
+//
+// 'build_glyph_map()' - Map each single-byte code to a glyph index.
+//
+// TrueType follows PDF 32000-1 9.6.6.4 (see also MuPDF's
+// pdf_load_simple_font()): non-symbolic fonts go code -> glyph name ->
+// Unicode -> (3,1) cmap or -> MacRoman -> (1,0) cmap; symbolic fonts use the
+// code directly in the (3,0) cmap (0x00XX or 0xF0XX) or the (1,0) cmap.
+// Type 1/CFF fonts look glyph names up directly.
+//
+
+static void
+build_glyph_map(p2c_font_t *font, bool has_encoding)
+{
+  FT_Face	face = font->ft_face;
+  const char	*format = FT_Get_Font_Format(face);
+  bool		truetype = format && !strcmp(format, "TrueType");
+  bool		symbolic = (font->flags & 4) && !(font->flags & 32);
+  FT_CharMap	ms_unicode = find_charmap(face, 3, 1),
+		ms_symbol = find_charmap(face, 3, 0),
+		mac = find_charmap(face, 1, 0),
+		builtin = find_charmap(face, 7, -1),	// Type 1/CFF built-in encoding
+		unicode_cmap = NULL;
+
+  for (int i = 0; i < face->num_charmaps; i ++)
+  {
+    if (face->charmaps[i]->encoding == FT_ENCODING_UNICODE)
+    {
+      unicode_cmap = face->charmaps[i];
+      break;
+    }
+  }
+
+  for (unsigned code = 0; code < 256; code ++)
+  {
+    int		unicode = font->encoding_table[code];
+    const char	*name = font->glyph_names[code];
+    FT_UInt	gid = 0;
+
+    if (truetype)
+    {
+      if (!symbolic)
+      {
+        gid = charmap_lookup(face, ms_unicode, (FT_ULong)unicode);
+        if (!gid)
+          gid = charmap_lookup(face, mac, (FT_ULong)unicode_to_mac_roman(unicode));
+      }
+
+      if (!gid && ms_symbol)
+      {
+        gid = charmap_lookup(face, ms_symbol, code);
+        for (FT_ULong high = 0xF000; !gid && high <= 0xF200; high += 0x100)
+          gid = charmap_lookup(face, ms_symbol, high | code);
+      }
+
+      if (!gid)
+        gid = charmap_lookup(face, mac, code);
+
+      if (!gid && symbolic)
+        gid = charmap_lookup(face, ms_unicode, (FT_ULong)unicode);
+    }
+    else
+    {
+      if (name && FT_HAS_GLYPH_NAMES(face))
+        gid = FT_Get_Name_Index(face, name);
+
+      if (!gid && has_encoding)
+        gid = charmap_lookup(face, unicode_cmap, (FT_ULong)unicode);
+
+      if (!gid)
+        gid = charmap_lookup(face, builtin, code);
+
+      if (!gid)
+        gid = charmap_lookup(face, unicode_cmap, (FT_ULong)unicode);
+    }
+
+    // Last resort: the TrueType 'post' table glyph names
+    if (!gid && name && FT_HAS_GLYPH_NAMES(face))
+      gid = FT_Get_Name_Index(face, name);
+
+    font->code_to_gid[code] = gid;
+  }
+}
+
+//
+// 'load_simple_widths()' - Build the code -> advance width table.
+//
+// Advances must come from /Widths (not from the font program), otherwise
+// subset/substituted fonts drift away from the layout in the PDF.
+//
+
+static void
+load_simple_widths(pdfio_dict_t *font_dict, pdfio_dict_t *descriptor, p2c_font_t *font)
+{
+  pdfio_array_t	*widths = dict_get_array(font_dict, "Widths");
+  size_t	count = pdfioArrayGetSize(widths);
+
+  font->first_char    = (int)pdfioDictGetNumber(font_dict, "FirstChar");
+  font->last_char     = (int)pdfioDictGetNumber(font_dict, "LastChar");
+  font->missing_width = pdfioDictGetNumber(descriptor, "MissingWidth");
+
+  if (count > 0 && (font->widths = calloc(count, sizeof(double))) != NULL)
+  {
+    font->num_widths = count;
+    for (size_t i = 0; i < count; i ++)
+      font->widths[i] = pdfioArrayGetNumber(widths, i);
+  }
+
+  // Type 3 glyph space is defined by /FontMatrix instead of 1/1000 em
+  if (font->subtype && !strcmp(font->subtype, "Type3"))
+  {
+    pdfio_array_t *matrix = dict_get_array(font_dict, "FontMatrix");
+
+    if (pdfioArrayGetSize(matrix) == 6)
+      font->width_scale = pdfioArrayGetNumber(matrix, 0);
+  }
+}
+
+static void
+build_code_widths(p2c_font_t *font)
+{
+  FT_Face face = font->ft_face;
+
+  for (int code = 0; code < 256; code ++)
+  {
+    double width = font->missing_width;
+
+    if (font->widths)
+    {
+      if (code >= font->first_char && (size_t)(code - font->first_char) < font->num_widths)
+        width = font->widths[code - font->first_char];
+    }
+    else if (face && face->units_per_EM &&
+             FT_Load_Glyph(face, font->code_to_gid[code], FT_LOAD_NO_SCALE) == 0)
+    {
+      // No /Widths (e.g. a non-embedded standard 14 font): use the font's own advance
+      width = face->glyph->advance.x * 1000.0 / face->units_per_EM;
+    }
+
+    font->code_widths[code] = width;
+  }
+}
+
+static int
+compare_cid_widths(const void *a, const void *b)
+{
+  const p2c_cid_width_t *wa = a, *wb = b;
+
+  return (wa->first < wb->first ? -1 : wa->first > wb->first);
+}
+
+static void
+add_cid_width(p2c_font_t *font, size_t *alloc, unsigned first, unsigned last, double width)
+{
+  if (font->num_cid_widths == *alloc)
+  {
+    size_t		new_alloc = *alloc ? *alloc * 2 : 64;
+    p2c_cid_width_t	*temp = realloc(font->cid_widths, new_alloc * sizeof(*temp));
+
+    if (!temp)
+      return;
+
+    font->cid_widths = temp;
+    *alloc           = new_alloc;
+  }
+
+  font->cid_widths[font->num_cid_widths ++] = (p2c_cid_width_t){ first, last, width };
+}
+
+//
+// 'load_cid_metrics()' - Load /W, /DW and /CIDToGIDMap of a CIDFont.
+//
+
+static void
+load_cid_metrics(pdfio_dict_t *cid_dict, p2c_font_t *font)
+{
+  pdfio_array_t	*w = dict_get_array(cid_dict, "W");
+  size_t	count = pdfioArrayGetSize(w), alloc = 0, i = 0;
+  pdfio_obj_t	*map_obj;
+
+  font->default_width = pdfioDictGetType(cid_dict, "DW") == PDFIO_VALTYPE_NUMBER ?
+                          pdfioDictGetNumber(cid_dict, "DW") : 1000.0;
+
+  // /W is a mix of "c [w1 w2 ...]" and "cfirst clast w"
+  while (i + 1 < count)
+  {
+    unsigned		first = (unsigned)pdfioArrayGetNumber(w, i);
+    pdfio_array_t	*list = array_get_array(w, i + 1);
+
+    if (list)
+    {
+      for (size_t j = 0; j < pdfioArrayGetSize(list); j ++)
+        add_cid_width(font, &alloc, first + (unsigned)j, first + (unsigned)j,
+                      pdfioArrayGetNumber(list, j));
+      i += 2;
+    }
+    else if (i + 2 < count)
+    {
+      add_cid_width(font, &alloc, first, (unsigned)pdfioArrayGetNumber(w, i + 1),
+                    pdfioArrayGetNumber(w, i + 2));
+      i += 3;
+    }
+    else
+      break;
+  }
+
+  if (font->num_cid_widths > 1)
+    qsort(font->cid_widths, font->num_cid_widths, sizeof(p2c_cid_width_t), compare_cid_widths);
+
+  // /CIDToGIDMap is /Identity (or absent) or a stream of big-endian 16-bit GIDs
+  if ((map_obj = pdfioDictGetObj(cid_dict, "CIDToGIDMap")) != NULL)
+  {
+    size_t	size;
+    uint8_t	*data = read_stream(map_obj, &size);
+
+    if (data && (font->cid_to_gid = calloc(size / 2 + 1, sizeof(FT_UInt))) != NULL)
+    {
+      font->num_cid_to_gid = size / 2;
+      for (i = 0; i < font->num_cid_to_gid; i ++)
+        font->cid_to_gid[i] = (FT_UInt)(data[2 * i] << 8 | data[2 * i + 1]);
+    }
+
+    free(data);
+  }
+}
+
+// Owns the FreeType face and its memory until cairo releases the font face
+typedef struct ft_face_owner_s
+{
+  FT_Face	face;
+  uint8_t	*data;
+} ft_face_owner_t;
+
+static void
+ft_face_owner_destroy(void *ptr)
+{
+  ft_face_owner_t *owner = ptr;
+
+  FT_Done_Face(owner->face);
+  free(owner->data);
+  free(owner);
+}
+
+//
+// 'create_cairo_face()' - Wrap the FreeType face for cairo.
+//
+// cairo may keep the face alive in its caches after we drop our reference,
+// so the FT_Face and the font data must be freed by cairo's destroy callback.
+//
+
+static bool
+create_cairo_face(p2c_font_t *font)
+{
+  static const cairo_user_data_key_t owner_key;
+  ft_face_owner_t	*owner;
+  cairo_font_face_t	*cairo_face;
+
+  if ((owner = calloc(1, sizeof(*owner))) == NULL)
+    return (false);
+
+  cairo_face = cairo_ft_font_face_create_for_ft_face(font->ft_face, FT_LOAD_NO_BITMAP);
+
+  owner->face = font->ft_face;
+  owner->data = font->data;
+
+  if (cairo_font_face_status(cairo_face) != CAIRO_STATUS_SUCCESS ||
+      cairo_font_face_set_user_data(cairo_face, &owner_key, owner, ft_face_owner_destroy) != CAIRO_STATUS_SUCCESS)
+  {
+    cairo_font_face_destroy(cairo_face);
+    free(owner);
+    return (false);
+  }
+
+  font->cairo_face = cairo_face;
+  font->data       = NULL;
+
+  return (true);
+}
+
+//
+// 'load_font()' - Load one font resource (simple or Type0/CID).
+//
+
+static bool
+load_font(FT_Library lib, pdfio_dict_t *font_dict, p2c_font_t *font)
+{
+  pdfio_dict_t	*descriptor;
+  FT_Face	face;
+  bool		has_encoding = false;
+
+  font->subtype     = pdfioDictGetName(font_dict, "Subtype");
+  font->font_name   = pdfioDictGetName(font_dict, "BaseFont");
+  font->width_scale = 0.001;
+
+  if (font->subtype && !strcmp(font->subtype, "Type0"))
+  {
+    // Composite font: everything lives in the single descendant CIDFont
+    pdfio_dict_t *cid_dict = array_get_dict(dict_get_array(font_dict, "DescendantFonts"), 0);
+    const char	 *cmap = pdfioDictGetName(font_dict, "Encoding");
+
+    if (!cid_dict)
+      return (false);
+
+    if (!cmap || (strcmp(cmap, "Identity-H") && strcmp(cmap, "Identity-V")))
+      fprintf(stderr, "WARNING: Font '%s' uses unsupported CMap '%s', assuming Identity-H.\n",
+              font->font_name ? font->font_name : "?", cmap ? cmap : "(stream)");
+
+    font->is_cid = true;
+    descriptor   = dict_get_dict(cid_dict, "FontDescriptor");
+    load_cid_metrics(cid_dict, font);
+  }
+  else
+  {
+    descriptor   = dict_get_dict(font_dict, "FontDescriptor");
+    load_simple_widths(font_dict, descriptor, font);
+    has_encoding = load_encoding(font_dict, font->encoding_table, font->glyph_names);
+  }
+
+  font->flags = (int)pdfioDictGetNumber(descriptor, "Flags");
+
+  if ((face = load_embedded_face(lib, descriptor, font)) != NULL)
+    font->is_embedded = true;
+  else if ((face = load_system_face(lib, font)) == NULL)
+    return (false);
+
+  font->ft_face = face;
+
+  if (!font->is_cid)
+  {
+    build_glyph_map(font, has_encoding);
+    build_code_widths(font);
+  }
+
+  return (create_cairo_face(font));
+}
+
+//
+// 'getPageFonts()' - Load the fonts of the page's /Font resource dictionary
 //
 
 bool 					  
 getPageFonts(p2c_device_t *dev) 	
 {
+  FT_Library lib;
+
   if (!dev || !dev->font_dict)
     return true; 
 
@@ -1275,161 +1877,46 @@ getPageFonts(p2c_device_t *dev)
   if (!dev->fonts)
     return false;
 
-  // Initialize FreeType as a static instance 
-  static FT_Library ft_library = NULL;
-  static bool ft_initialized = false;
-  if (!ft_initialized)
-  {
-    if (FT_Init_FreeType(&ft_library) != 0)
-    {
-      fprintf(stderr, "ERROR: Could not initialize FreeType library.\n");
-      return false;
-    }
-    ft_initialized = true;
-  }
+  if ((lib = get_ft_library()) == NULL)
+    return false;
 
-  for(size_t cur_font=0; cur_font < dev->num_fonts; cur_font++) 
+  for (size_t cur_font = 0; cur_font < dev->num_fonts; cur_font ++)
   {
-    dev->fonts[cur_font] = calloc(1, sizeof(*dev->fonts[cur_font]));
-    if (!dev->fonts[cur_font])
+    p2c_font_t		*font;
+    const char		*font_key = pdfioDictGetKey(dev->font_dict, cur_font);
+    pdfio_dict_t	*font_dict = dict_get_dict(dev->font_dict, font_key);
+
+    if ((font = dev->fonts[cur_font] = calloc(1, sizeof(p2c_font_t))) == NULL)
     {
       device_clear_fonts(dev);
       return false;
     }
 
-    const char *font_key = pdfioDictGetKey(dev->font_dict, cur_font);
-    if (!font_key)
+    if (!font_key || !font_dict)
       continue;
 
-    dev->fonts[cur_font] = calloc(1, sizeof(p2c_font_t));
-    if (!dev->fonts[cur_font])
-      continue;
+    // Use dictionary key (e.g. "F1") as the reference name
+    font->ref_font_name = font_key;
 
-    pdfio_obj_t *ref_font_obj = pdfioDictGetObj(dev->font_dict, font_key);
-    pdfio_dict_t *ref_font_dict = pdfioObjGetDict(ref_font_obj);
-    if (!ref_font_dict)
-      continue;
-
-    // Use dictionary key (e.g. "F1") as the reference name, 
-    dev->fonts[cur_font]->ref_font_name = font_key; 
-    dev->fonts[cur_font]->font_name = pdfioDictGetName(ref_font_dict, "BaseFont");
-    dev->fonts[cur_font]->encoding = pdfioDictGetName(ref_font_dict, "Encoding");
-
-    dev->fonts[cur_font]->first_char = (int)pdfioDictGetNumber(ref_font_dict, "FirstChar");
-    dev->fonts[cur_font]->last_char = (int)pdfioDictGetNumber(ref_font_dict, "LastChar");
-    
-    load_encoding(dev->page_obj, font_key, dev->fonts[cur_font]->encoding_table);
-
-    pdfio_obj_t *width_object = pdfioDictGetObj(ref_font_dict, "Widths");
-    pdfio_array_t *width_array = pdfioObjGetArray(width_object);
-
-    if (width_array)
+    if (!load_font(lib, font_dict, font))
     {
-      size_t width_array_size = pdfioArrayGetSize(width_array);
-      if (width_array_size > 0)
-      {
-	dev->fonts[cur_font]->widths = calloc(width_array_size, sizeof(*dev->fonts[cur_font]->widths));
-	
-	if(!dev->fonts[cur_font]->widths)
- 	{
-	  device_clear_fonts(dev);
-      	  return false;
-	}
-
-	dev->fonts[cur_font]->num_widths = width_array_size;
-
-	for (size_t width_array_index = 0; width_array_index < width_array_size; width_array_index++)
-          dev->fonts[cur_font]->widths[width_array_index] = pdfioArrayGetNumber(width_array, width_array_index);
-      }
-    }
-
-    pdfio_dict_t *descriptor_dict = pdfioDictGetDict(ref_font_dict, "FontDescriptor");
-    pdfio_obj_t *font_file_obj = NULL;
-
-    if (descriptor_dict)
-    {
-      font_file_obj = pdfioDictGetObj(descriptor_dict, "FontFile2");
-      if (!font_file_obj)
-        font_file_obj = pdfioDictGetObj(descriptor_dict, "FontFile");
-    }
-
-    int ft_error = -1;
-    FT_Face ft_face = NULL;
-
-    if (font_file_obj)
-    {
-      pdfio_stream_t *st = pdfioObjOpenStream(font_file_obj, true);
-      if (st)
-      {
-        size_t capacity = 64 * 1024;
-        size_t total_bytes = 0;
-        unsigned char *buffer = malloc(capacity);
-
-        if (buffer)
-        {
-          ssize_t bytes_read;
-          unsigned char read_buf[4096];
-
-          while ((bytes_read = pdfioStreamRead(st, read_buf, sizeof(read_buf))) > 0)
-          {
-            if (total_bytes + bytes_read > capacity)
-            {
-              capacity *= 2;
-              unsigned char *new_buffer = realloc(buffer, capacity);
-              if (!new_buffer)
-              {
-                free(buffer);
-                buffer = NULL;
-                break;
-              }
-              buffer = new_buffer;
-            }
-            memcpy(buffer + total_bytes, read_buf, bytes_read);
-            total_bytes += bytes_read;
-          }
-
-          if (buffer && total_bytes > 0)
-          {
-            dev->fonts[cur_font]->data = buffer;
-            dev->fonts[cur_font]->data_size = total_bytes;
-
-            ft_error = FT_New_Memory_Face(ft_library, 
-                                          dev->fonts[cur_font]->data, 
-                                          (FT_Long)total_bytes, 
-                                          0, 
-                                          &ft_face);
-          }
-          else if (buffer)
-          {
-            free(buffer);
-          }
-        }
-        pdfioStreamClose(st);
-      }
-    }
-
-    if (ft_error != 0 || !ft_face)
-    {
-      const char *fallback_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
-      ft_error = FT_New_Face(ft_library, fallback_path, 0, &ft_face);
-      
-      if (ft_error != 0)
-        continue;
-    }
-
-    dev->fonts[cur_font]->ft_face = ft_face;
-
-    cairo_font_face_t *cairo_face = cairo_ft_font_face_create_for_ft_face(ft_face, 0);
-    if (cairo_font_face_status(cairo_face) != CAIRO_STATUS_SUCCESS)
-    {
-      FT_Done_Face(ft_face);
+      fprintf(stderr, "WARNING: Unable to load font '%s' (%s).\n", font_key,
+              font->font_name ? font->font_name : "?");
       continue;
     }
 
-    static const cairo_user_data_key_t cleanup_key;
-    cairo_font_face_set_user_data(cairo_face, &cleanup_key, ft_face, (cairo_destroy_func_t)FT_Done_Face);
-
-    dev->fonts[cur_font]->cairo_face = cairo_face;
+    if (g_verbose)
+    {
+      fprintf(stderr, "DEBUG: Font %s: %s %s, %s, flags=%d, format=%s, cmaps=",
+              font_key, font->font_name ? font->font_name : "?",
+              font->subtype ? font->subtype : "?",
+              font->is_embedded ? "embedded" : "substituted", font->flags,
+              FT_Get_Font_Format(font->ft_face));
+      for (int i = 0; i < font->ft_face->num_charmaps; i ++)
+        fprintf(stderr, "(%d,%d)", font->ft_face->charmaps[i]->platform_id,
+                font->ft_face->charmaps[i]->encoding_id);
+      fputc('\n', stderr);
+    }
   }
 
   return true;

@@ -21,6 +21,7 @@
 
 // Global verbose flag (declared in main)
 extern int g_verbose;
+typedef struct p2c_font_s p2c_font_t;
 
 #define MAX_GSTATE 64 // Maximum nesting of graphics states
 
@@ -45,29 +46,57 @@ typedef struct graphics_state_s
   double 	text_leading;
   
   // Text State
-  double 	font_size;
-  char 		font_name[128];
-  int 		encoding[256];
+  p2c_font_t 	*font;
+  double 	font_size;		// Tfs
+  double	char_spacing;		// Tc
+  double	word_spacing;		// Tw
+  double	horiz_scaling;		// Th = Tz / 100
+  double	text_rise;		// Ts
   int 		text_rendering_mode;
 
   p2c_colorspace_t fill_colorspace;
   p2c_colorspace_t stroke_colorspace;
 } graphics_state_t;
 
+
+// CID width range from a CIDFont /W array
+typedef struct p2c_cid_width_s
+{
+  unsigned	first, last;		// CID range
+  double	width;			// Width in glyph space (1/1000 em)
+} p2c_cid_width_t;
+
+// Internal Fonts objects
 typedef struct p2c_font_s
 {
   const char	*ref_font_name;		// PDF font reference Name e.g. "F1"
   const char   	*font_name;    		// Original Font Name e.g. "BCDEEE+Calibri"
-  const char	*encoding;		// Encoding type.
-  uint8_t   	*data;         		// Font Binary data
+  const char	*subtype;		// Font Subtype e.g. "TrueType", "Type0"
+  int		flags;			// FontDescriptor /Flags
+  bool		is_embedded;		// Font program came from the PDF
+  bool		is_cid;			// Type0 font: 2-byte codes, CID -> GID
+
+  uint8_t   	*data;         		// Font Binary data (owned by cairo_face once created)
   size_t    	data_size;     		// size of data
 					
   int           first_char;       	// starting CID/GID
   int           last_char;        	// ending CID/GID
+
   double        *widths;           	// Extract from the /Widths array
   size_t 	num_widths;		// Number of Extracted /Widths Array
+  double 	missing_width;
+  double	width_scale;		// Glyph space -> text space (0.001, Type3 uses FontMatrix)
 
-  int           encoding_table[256];
+  int 	        encoding_table[256];	// Code -> Unicode
+  const char	*glyph_names[256];	// Code -> glyph name from /Differences
+  FT_UInt 	code_to_gid[256];	// Simple fonts: code -> glyph index
+  double	code_widths[256];	// Simple fonts: code -> advance (glyph space)
+
+  FT_UInt	*cid_to_gid;		// CIDToGIDMap stream (NULL = Identity)
+  size_t	num_cid_to_gid;
+  p2c_cid_width_t *cid_widths;		// Sorted /W ranges
+  size_t	num_cid_widths;
+  double	default_width;		// /DW
 
   FT_Face       ft_face;            	// Active FreeType face object initialized from 'data'
   cairo_font_face_t *cairo_face; 	// The face created for Cairo
@@ -90,6 +119,10 @@ struct cairo_device_s
   p2c_font_t        	**fonts;    // Array of extracted font structures
   size_t            	num_fonts;
 
+  // Glyph outlines collected by clipping text render modes (4-7) until ET
+  cairo_path_t		**text_clip_paths;
+  size_t		num_text_clip_paths;
+
   // TODO: For XOBJECTS
   pdfio_dict_t 		*xobject_dict;
   pdfio_obj_t 		*page_obj;
@@ -98,5 +131,8 @@ struct cairo_device_s
 p2c_device_t* device_create(pdfrip_page_t *page, int dpi);
 void 	      device_destroy(p2c_device_t *dev);
 void 	      device_save_to_png(p2c_device_t *dev, const char *filename);
+
+
+
 
 #endif // CAIRO_INTERNAL_H

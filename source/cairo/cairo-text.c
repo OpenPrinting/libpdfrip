@@ -21,7 +21,24 @@ device_begin_text(p2c_device_t *dev)
 
 void 
 device_end_text(p2c_device_t *dev) 
-{}
+{
+  // Clipping render modes (4-7) intersect the clip with all glyph outlines
+  // shown in this text object.
+  if (dev->num_text_clip_paths == 0)
+    return;
+
+  cairo_new_path(dev->cr);
+  for (size_t i = 0; i < dev->num_text_clip_paths; i ++)
+  {
+    cairo_append_path(dev->cr, dev->text_clip_paths[i]);
+    cairo_path_destroy(dev->text_clip_paths[i]);
+  }
+  cairo_clip(dev->cr);
+
+  free(dev->text_clip_paths);
+  dev->text_clip_paths = NULL;
+  dev->num_text_clip_paths = 0;
+}
 
 void 
 device_set_text_leading(p2c_device_t *dev, 
@@ -59,122 +76,285 @@ device_set_text_matrix(p2c_device_t *dev,
   gs->text_line_matrix = gs->text_matrix;
 }
 
-void 
-device_set_font(p2c_device_t *dev, 
-		const char *font_name, 
-		double font_size) 
+void
+device_set_font(p2c_device_t *dev,
+                const char *font_name,
+                double font_size)
 {
-  graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
-
-  gs->font_size = font_size;
-  // Safely copy the font name to the graphics state
-  strncpy(gs->font_name, font_name, sizeof(gs->font_name) - 1);
-  gs->font_name[sizeof(gs->font_name) - 1] = '\0';
-
-  // Find the loaded font in our extracted device fonts array
+  graphics_state_t *gs;
   p2c_font_t *active_font = NULL;
-  for (size_t i = 0; i < dev->num_fonts; i++) 
+
+  if (!dev || !font_name)
+    return;
+
+  gs = &dev->gstack[dev->gstack_ptr];
+
+  /*
+   * Find the font loaded from the page's /Font resource dictionary.
+   * Both names should use the same form, normally "F1" without '/'.
+   */
+  for (size_t i = 0; i < dev->num_fonts; i++)
   {
-    // Match the requested PDF resource name (e.g., "F1") with the parsed font
-    if (dev->fonts[i] && dev->fonts[i]->ref_font_name && 
-        strcmp(dev->fonts[i]->ref_font_name, font_name) == 0) 
+    p2c_font_t *font = dev->fonts[i];
+
+    if (font &&
+        font->ref_font_name &&
+        strcmp(font->ref_font_name, font_name) == 0)
     {
-      active_font = dev->fonts[i];
+      active_font = font;
       break;
     }
   }
 
-  // Apply the true embedded FreeType font face to the Cairo context
-  if (active_font && active_font->cairo_face) 
+  gs->font_size = font_size;
+  gs->font = active_font;
+
+  if (!active_font)
   {
-    if (g_verbose)
-      fprintf(stderr, "DEBUG: Applying embedded font face: %s\n", font_name);
-      
-    cairo_set_font_face(dev->cr, active_font->cairo_face);
-  } 
-  else 
-  {
-    if (g_verbose)
-      fprintf(stderr, "DEBUG: Font %s not found, falling back to basic Sans.\n", font_name);
-      
-    cairo_select_font_face(dev->cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+    fprintf(stderr,
+            "WARNING: Font resource '%s' was not loaded.\n",
+            font_name);
+    return;
   }
 
-  cairo_set_font_size(dev->cr, font_size);
+  if (!active_font->cairo_face)
+  {
+    fprintf(stderr,
+            "WARNING: Font resource '%s' has no Cairo font face.\n",
+            font_name);
+    return;
+  }
 
-  // Load the encoding table for this specific font
-  // (NOTE: Using dev->page_obj instead of dev->page based on our previous header fixes!)
-  if (dev->page_obj) {
-      load_encoding(dev->page_obj, font_name, gs->encoding);
+  if (g_verbose)
+  {
+    fprintf(stderr,
+            "DEBUG: Selected font '%s' (%s).\n",
+            font_name, active_font->font_name ? active_font->font_name : "?");
   }
 }
 
-static void 
-utf8_encode(int unicode, 
-	    char *out, 
-	    int *len) 
+void
+device_set_char_spacing(p2c_device_t *dev,
+                        double spacing)
 {
-  if (unicode < 0x80) 
-  { 
-    *len=1; 
-    out[0]=unicode; 
-  }
-  else if (unicode < 0x800) 
-  { 
-    *len=2;
-    out[0]=0xC0|(unicode>>6); 
-    out[1]=0x80|(unicode&0x3F); 
-  }
-  else 
-  { 
-    *len=3; 
-    out[0]=0xE0|(unicode>>12); 
-    out[1]=0x80|((unicode>>6)&0x3F); 
-    out[2]=0x80|(unicode&0x3F); 
-  }
-  out[*len] = 0;
+  dev->gstack[dev->gstack_ptr].char_spacing = spacing;
 }
+
+void
+device_set_word_spacing(p2c_device_t *dev,
+                        double spacing)
+{
+  dev->gstack[dev->gstack_ptr].word_spacing = spacing;
+}
+
+void
+device_set_horizontal_scaling(p2c_device_t *dev,
+                              double percent)
+{
+  dev->gstack[dev->gstack_ptr].horiz_scaling = percent / 100.0;
+}
+
+void
+device_set_text_rise(p2c_device_t *dev,
+                     double rise)
+{
+  dev->gstack[dev->gstack_ptr].text_rise = rise;
+}
+
+//
+// 'font_lookup_glyph()' - Map a character code to a glyph index and its
+//                         advance width w0 (in text space, per unit font size).
+//
+
+static void
+font_lookup_glyph(const p2c_font_t *font,
+                  unsigned code,
+                  unsigned long *gid,
+                  double *w0)
+{
+  double width;
+
+  if (font->is_cid)
+  {
+    // Identity-H/V: the 2-byte code is the CID
+    unsigned cid = code;
+
+    if (font->cid_to_gid)
+      *gid = cid < font->num_cid_to_gid ? font->cid_to_gid[cid] : 0;
+    else
+      *gid = cid;
+
+    width = font->default_width;
+
+    // Binary search the sorted /W ranges
+    size_t lo = 0, hi = font->num_cid_widths;
+    while (lo < hi)
+    {
+      size_t mid = (lo + hi) / 2;
+      const p2c_cid_width_t *r = &font->cid_widths[mid];
+
+      if (cid < r->first)
+        hi = mid;
+      else if (cid > r->last)
+        lo = mid + 1;
+      else
+      {
+        width = r->width;
+        break;
+      }
+    }
+  }
+  else
+  {
+    *gid = font->code_to_gid[code & 255];
+    width = font->code_widths[code & 255];
+  }
+
+  *w0 = width * font->width_scale;
+}
+
+//
+// 'draw_glyphs()' - Paint positioned glyphs according to the text render mode.
+//                   Glyph positions are in text space (relative to Tm).
+//
+
+static void
+draw_glyphs(p2c_device_t *dev,
+            cairo_glyph_t *glyphs,
+            int num_glyphs)
+{
+  graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
+  cairo_t *cr = dev->cr;
+  int mode = gs->text_rendering_mode;
+  bool fill = (mode == 0 || mode == 2 || mode == 4 || mode == 6);
+  bool stroke = (mode == 1 || mode == 2 || mode == 5 || mode == 6);
+  bool clip = (mode >= 4);
+  cairo_matrix_t font_matrix, check;
+
+  if (num_glyphs == 0 || mode == 3)
+    return;
+
+  // The font matrix scales the 1-em glyph space to Tfs x Th and flips Y
+  // because cairo glyphs are y-down while PDF text space is y-up.
+  cairo_matrix_init(&font_matrix,
+                    gs->font_size * gs->horiz_scaling, 0,
+                    0, -gs->font_size,
+                    0, 0);
+
+  // "0 Tf" or a degenerate Tm (used for hidden text) would put the cairo
+  // context into a permanent error state and stop all further drawing.
+  cairo_matrix_multiply(&check, &font_matrix, &gs->text_matrix);
+  if (cairo_matrix_invert(&check) != CAIRO_STATUS_SUCCESS)
+    return;
+
+  cairo_save(cr);
+
+  // User space becomes text space (y-up)
+  cairo_transform(cr, &gs->text_matrix);
+  cairo_set_font_face(cr, gs->font->cairo_face);
+  cairo_set_font_matrix(cr, &font_matrix);
+
+  if (fill && !stroke && !clip)
+  {
+    // Fast path: normal filled text
+    cairo_set_source_rgba(cr, gs->fill_rgb[0], gs->fill_rgb[1],
+                          gs->fill_rgb[2], gs->fill_alpha);
+    cairo_show_glyphs(cr, glyphs, num_glyphs);
+    cairo_restore(cr);
+    return;
+  }
+
+  cairo_new_path(cr);
+  cairo_glyph_path(cr, glyphs, num_glyphs);
+
+  // The path survives cairo_restore(); stroking afterwards makes the line
+  // width use user space like the rest of the page.
+  cairo_restore(cr);
+
+  if (fill)
+  {
+    cairo_set_source_rgba(cr, gs->fill_rgb[0], gs->fill_rgb[1],
+                          gs->fill_rgb[2], gs->fill_alpha);
+    cairo_fill_preserve(cr);
+  }
+
+  if (stroke)
+  {
+    cairo_set_source_rgba(cr, gs->stroke_rgb[0], gs->stroke_rgb[1],
+                          gs->stroke_rgb[2], gs->stroke_alpha);
+    cairo_stroke_preserve(cr);
+  }
+
+  if (clip)
+  {
+    cairo_path_t **paths = realloc(dev->text_clip_paths,
+                                   (dev->num_text_clip_paths + 1) * sizeof(*paths));
+
+    if (paths)
+    {
+      dev->text_clip_paths = paths;
+      dev->text_clip_paths[dev->num_text_clip_paths ++] = cairo_copy_path(cr);
+    }
+  }
+
+  cairo_new_path(cr);
+}
+
+//
+// 'device_show_text()' - Show a string (Tj): map each code to a glyph, place
+//                        it using the PDF widths and advance Tm (PDF 9.4.4).
+//
 
 void 
 device_show_text(p2c_device_t *dev, 
-		 const char *str) 
+		 const unsigned char *str,
+		 size_t len) 
 {
   graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
+  p2c_font_t *font = gs->font;
+  cairo_glyph_t stack_glyphs[256], *glyphs = stack_glyphs;
+  size_t bytes_per_code, num_codes, num_glyphs = 0;
+  double x = 0.0;
 
-  cairo_save(dev->cr);
+  if (!font || !str || len == 0)
+    return;
 
-  // Get Text Matrix and Flip Y for upright text
-  cairo_matrix_t tm = gs->text_matrix;
-  cairo_matrix_scale(&tm, 1.0, -1.0); // Flip Y because Cairo is Top-Down but we set CTM to Bottom-Up
-  cairo_transform(dev->cr, &tm);
+  bytes_per_code = font->is_cid ? 2 : 1;
+  num_codes = len / bytes_per_code;
 
-  // Decode String to UTF-8 using the encoding table
-  char *utf8_str = malloc(strlen(str) * 4 + 1);
-  char *p = utf8_str;
-  for (int i = 0; str[i]; i++) 
+  if (num_codes > sizeof(stack_glyphs) / sizeof(stack_glyphs[0]))
   {
-    int code = (unsigned char)str[i];
-    int unicode = gs->encoding[code];
-    int len;
-    utf8_encode(unicode, p, &len);
-    p += len;
+    if ((glyphs = malloc(num_codes * sizeof(*glyphs))) == NULL)
+      return;
   }
-  *p = 0;
 
-  // Draw
-  cairo_set_source_rgb(dev->cr, gs->fill_rgb[0], gs->fill_rgb[1], gs->fill_rgb[2]);
-  cairo_show_text(dev->cr, utf8_str);
+  for (size_t i = 0; i + bytes_per_code <= len; i += bytes_per_code)
+  {
+    unsigned code = bytes_per_code == 2 ? (unsigned)(str[i] << 8 | str[i + 1]) : str[i];
+    unsigned long gid;
+    double w0, tx;
 
-  // Advance
-  cairo_text_extents_t extents;
-  cairo_text_extents(dev->cr, utf8_str, &extents);
+    font_lookup_glyph(font, code, &gid, &w0);
 
-  cairo_restore(dev->cr);
+    glyphs[num_glyphs].index = gid;
+    glyphs[num_glyphs].x = x;
+    glyphs[num_glyphs].y = gs->text_rise;
+    num_glyphs ++;
 
-  // Advance internal matrix (unflipped)
-  cairo_matrix_translate(&dev->gstack[dev->gstack_ptr].text_matrix, extents.x_advance, 0);
+    // tx = (w0 * Tfs + Tc + Tw) * Th; Tw only applies to single-byte code 32
+    tx = w0 * gs->font_size + gs->char_spacing;
+    if (bytes_per_code == 1 && code == 32)
+      tx += gs->word_spacing;
+    x += tx * gs->horiz_scaling;
+  }
 
-  free(utf8_str);
+  if (font->cairo_face)
+    draw_glyphs(dev, glyphs, (int)num_glyphs);
+
+  cairo_matrix_translate(&gs->text_matrix, x, 0);
+
+  if (glyphs != stack_glyphs)
+    free(glyphs);
 }
 
 void 
@@ -187,12 +367,12 @@ device_show_text_kerning(p2c_device_t *dev,
   {
     if (operands[i].type == OP_TYPE_STRING) 
     {
-      device_show_text(dev, operands[i].value.string);
+      device_show_text(dev, operands[i].value.string, operands[i].length);
     } 
     else if (operands[i].type == OP_TYPE_NUMBER) 
     {
-      double adj = -operands[i].value.number / 1000.0 * gs->font_size;
-      cairo_matrix_translate(&dev->gstack[dev->gstack_ptr].text_matrix, adj, 0);
+      double adj = -operands[i].value.number / 1000.0 * gs->font_size * gs->horiz_scaling;
+      cairo_matrix_translate(&gs->text_matrix, adj, 0);
     }
   }
 }

@@ -47,5 +47,5 @@ void freePageData(pdfrip_page_t *page);
 
 // Text helper functions
 bool getPageFonts(p2c_device_t *dev);
-void load_encoding(pdfio_obj_t *page_obj, const char *name, int encoding[256]);
+bool load_encoding(pdfio_dict_t *font_dict, int encoding[256], const char *names[256]);
 #endif //PDFOPS_PRIVATE_H

@@ -26,8 +26,8 @@ CFLAGS   = -g -Wall -Isource/pdf -Isource/cairo -Isource/tools/pdf2cairo
 PDFIO_CFLAGS   = $(shell pkg-config --cflags pdfio)
 PDFIO_LIBS     = $(shell pkg-config --libs pdfio)
 
-CAIRO_CFLAGS   = $(shell pkg-config --cflags cairo-ft cairo)
-CAIRO_LIBS     = $(shell pkg-config --libs cairo-ft cairo) -lpng16 -lz -lm -lcairo -ljpeg
+CAIRO_CFLAGS   = $(shell pkg-config --cflags cairo-ft cairo freetype2 fontconfig)
+CAIRO_LIBS     = $(shell pkg-config --libs cairo-ft cairo freetype2 fontconfig) -lpng16 -lz -lm -lcairo -ljpeg
 
 # --- Final Build Flags ---
 BUILD_CFLAGS = $(CFLAGS) $(PDFIO_CFLAGS) $(CAIRO_CFLAGS)
@@ -94,6 +94,6 @@ clean:
 	rm -rf build
 
 # --- Dependencies (Manual Header Tracking) ---
-$(OBJS): source/pdf/pdfops-private.h source/cairo/cairo-private.h source/pdf/parser.h
+$(OBJS): source/pdf/pdfops-private.h source/cairo/cairo-private.h source/cairo/cairo-device-private.h source/pdf/parser.h
 $(TEST_OBJ): testpdf2cairo.c test.h
 

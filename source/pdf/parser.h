@@ -28,11 +28,12 @@ typedef enum operand_type_s
 typedef struct operand_s
 {
   operand_type_t type;
+  size_t	 length;		// Number of bytes in value.string
   union 
   {
     double number;
     char name[1024];
-    char string[1024];
+    unsigned char string[1024];		// Raw string bytes (may contain NULs)
   } value;
 } operand_t;
 

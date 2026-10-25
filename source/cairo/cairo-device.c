@@ -60,17 +60,25 @@ device_create(pdfrip_page_t *page,
     .stroke_alpha = 1.0,
     .text_leading = 0.0,
     .font_size = 1.0,
+    .horiz_scaling = 1.0,
     .text_rendering_mode = 0,
     .fill_colorspace = CS_DEVICE_GRAY,
     .stroke_colorspace = CS_DEVICE_GRAY
   };
 
+  // PDF gives every glyph an exact position and advance, so keep cairo from
+  // rounding glyph metrics or grid-fitting outlines (this also reproduces the
+  // output of poppler's Cairo backend).
+  cairo_font_options_t *font_options = cairo_font_options_create();
+  cairo_font_options_set_antialias(font_options, CAIRO_ANTIALIAS_GRAY);
+  cairo_font_options_set_hint_style(font_options, CAIRO_HINT_STYLE_NONE);
+  cairo_font_options_set_hint_metrics(font_options, CAIRO_HINT_METRICS_OFF);
+  cairo_set_font_options(dev->cr, font_options);
+  cairo_font_options_destroy(font_options);
+
   cairo_matrix_init_identity(&dev->gstack[0].text_matrix);
   cairo_matrix_init_identity(&dev->gstack[0].text_line_matrix);
   dev->gstack_ptr = 0;
-
-  for (int i=0; i<256; i++) 
-    dev->gstack[0].encoding[i] = i;
 
   cairo_set_source_rgb(dev->cr, 1.0, 1.0, 1.0);
   cairo_paint(dev->cr);
@@ -90,9 +98,11 @@ p2c_font_destroy(p2c_font_t *font)
 
   if (font->cairo_face)
   {
+    // The cairo face's user-data destructor frees ft_face and data.
     cairo_font_face_destroy(font->cairo_face);
     font->cairo_face = NULL;
     font->ft_face = NULL;
+    font->data = NULL;
   }
   else if (font->ft_face)
   {
@@ -102,6 +112,8 @@ p2c_font_destroy(p2c_font_t *font)
 
   free(font->data);
   free(font->widths);
+  free(font->cid_to_gid);
+  free(font->cid_widths);
   free(font);
 }
 
@@ -151,6 +163,10 @@ device_destroy(p2c_device_t *dev)
   }
   
   device_clear_fonts(dev);
+
+  for (size_t i = 0; i < dev->num_text_clip_paths; i ++)
+    cairo_path_destroy(dev->text_clip_paths[i]);
+  free(dev->text_clip_paths);
   
   if (dev->surface)
   {
