@@ -9,8 +9,12 @@
 #include "cairo-private.h"
 #include "../pdf/pdfops-private.h"
 
-void 
-device_begin_text(p2c_device_t *dev) 
+//
+// 'device_begin_text()' - Begin a text object (BT operator).
+//
+
+void                                  // O - Void
+device_begin_text(p2c_device_t *dev)  // I - Active Rendering Context
 {
   if (g_verbose) 
     fprintf(stderr, "DEBUG: Begin Text\n");
@@ -19,8 +23,12 @@ device_begin_text(p2c_device_t *dev)
   cairo_matrix_init_identity(&dev->gstack[dev->gstack_ptr].text_line_matrix);
 }
 
-void 
-device_end_text(p2c_device_t *dev) 
+//
+// 'device_end_text()' - End a text object (ET operator).
+//
+
+void                                // O - Void
+device_end_text(p2c_device_t *dev)  // I - Active Rendering Context
 {
   // Clipping render modes (4-7) intersect the clip with all glyph outlines
   // shown in this text object.
@@ -40,16 +48,27 @@ device_end_text(p2c_device_t *dev)
   dev->num_text_clip_paths = 0;
 }
 
-void 
-device_set_text_leading(p2c_device_t *dev, 
-		      	double leading) 
+//
+// 'device_set_text_leading()' - Set the text leading (TL operator, also set by
+//                               TD).
+//
+
+void                                        // O - Void
+device_set_text_leading(p2c_device_t *dev,  // I - Active Rendering Context
+                        double leading)     // I - Leading (TL)
 {
   dev->gstack[dev->gstack_ptr].text_leading = leading;
 }
 
-void 
-device_move_text_cursor(p2c_device_t *dev, 
-		   	double tx, double ty) 
+//
+// 'device_move_text_cursor()' - Move to the start of the next line (Td
+//                               operator, also used by TD, T*, ' and ").
+//
+
+void                                        // O - Void
+device_move_text_cursor(p2c_device_t *dev,  // I - Active Rendering Context
+                        double tx,          // I - Horizontal offset in text space
+                        double ty)          // I - Vertical offset in text space
 {
   graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
   cairo_matrix_t trans;
@@ -58,28 +77,42 @@ device_move_text_cursor(p2c_device_t *dev,
   gs->text_matrix = gs->text_line_matrix;
 }
 
-void 
-device_next_line(p2c_device_t *dev) 
+//
+// 'device_next_line()' - Move to the start of the next line (T* operator, also
+//                        used by ' and ").
+//
+
+void                                 // O - Void
+device_next_line(p2c_device_t *dev)  // I - Active Rendering Context
 {
   graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
   device_move_text_cursor(dev, 0, -gs->text_leading);
 }
 
-void 
-device_set_text_matrix(p2c_device_t *dev, 
-		       double a, double b, 
-		       double c, double d, 
-		       double e, double f) 
+//
+// 'device_set_text_matrix()' - Set the text matrix and the text line matrix
+//                              (Tm operator).
+//
+
+void                                        // O - Void
+device_set_text_matrix(p2c_device_t *dev,   // I - Active Rendering Context
+                       double a, double b,  // I - Text matrix [a b c d e f]
+                       double c, double d,
+                       double e, double f)
 {
   graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
   cairo_matrix_init(&gs->text_matrix, a, b, c, d, e, f);
   gs->text_line_matrix = gs->text_matrix;
 }
 
-void
-device_set_font(p2c_device_t *dev,
-                p2c_font_t *font,
-                double font_size)
+//
+// 'device_set_font()' - Select the font and font size (Tf operator).
+//
+
+void                                // O - Void
+device_set_font(p2c_device_t *dev,  // I - Active Rendering Context
+                p2c_font_t *font,   // I - Font, or NULL if not found
+                double font_size)   // I - Font size (Tfs)
 {
   graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
 
@@ -96,44 +129,63 @@ device_set_font(p2c_device_t *dev,
   }
 }
 
-void
-device_set_char_spacing(p2c_device_t *dev,
-                        double spacing)
+//
+// 'device_set_char_spacing()' - Set the character spacing (Tc operator).
+//
+
+void                                        // O - Void
+device_set_char_spacing(p2c_device_t *dev,  // I - Active Rendering Context
+                        double spacing)     // I - Character spacing (Tc)
 {
   dev->gstack[dev->gstack_ptr].char_spacing = spacing;
 }
 
-void
-device_set_word_spacing(p2c_device_t *dev,
-                        double spacing)
+//
+// 'device_set_word_spacing()' - Set the word spacing (Tw operator).
+//
+
+
+void                                        // O - Void
+device_set_word_spacing(p2c_device_t *dev,  // I - Active Rendering Context
+                        double spacing)     // I - Word spacing (Tw)
 {
   dev->gstack[dev->gstack_ptr].word_spacing = spacing;
 }
 
-void
-device_set_horizontal_scaling(p2c_device_t *dev,
-                              double percent)
+//
+// 'device_set_horizontal_scaling()' - Set the horizontal scaling (Tz
+//                                     operator).
+//
+
+void                                              // O - Void
+device_set_horizontal_scaling(p2c_device_t *dev,  // I - Active Rendering Context
+                              double percent)     // I - Horizontal scaling (Tz) in percent
 {
   dev->gstack[dev->gstack_ptr].horiz_scaling = percent / 100.0;
 }
 
-void
-device_set_text_rise(p2c_device_t *dev,
-                     double rise)
+//
+// 'device_set_text_rise()' - Set the text rise (Ts operator).
+//
+
+void                                     // O - Void
+device_set_text_rise(p2c_device_t *dev,  // I - Active Rendering Context
+                     double rise)        // I - Text rise (Ts)
 {
   dev->gstack[dev->gstack_ptr].text_rise = rise;
 }
 
 //
 // 'font_lookup_glyph()' - Map a character code to a glyph index and its
-//                         advance width w0 (in text space, per unit font size).
+//                         advance width w0 (in text space, per unit font
+//                         size).
 //
 
-static void
-font_lookup_glyph(const p2c_font_t *font,
-                  unsigned code,
-                  unsigned long *gid,
-                  double *w0)
+static void                                // O - Void
+font_lookup_glyph(const p2c_font_t *font,  // I - Font
+                  unsigned code,           // I - Character code (1 or 2 bytes)
+                  unsigned long *gid,      // O - Glyph index
+                  double *w0)              // O - Advance width per unit font size
 {
   double width;
 
@@ -178,13 +230,12 @@ font_lookup_glyph(const p2c_font_t *font,
 
 //
 // 'draw_glyphs()' - Paint positioned glyphs according to the text render mode.
-//                   Glyph positions are in text space (relative to Tm).
 //
 
-static void
-draw_glyphs(p2c_device_t *dev,
-            cairo_glyph_t *glyphs,
-            int num_glyphs)
+static void                         // O - Void
+draw_glyphs(p2c_device_t *dev,      // I - Active Rendering Context
+            cairo_glyph_t *glyphs,  // I - Glyph indices and positions
+            int num_glyphs)         // I - Number of glyphs
 {
   graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
   cairo_t *cr = dev->cr;
@@ -267,14 +318,11 @@ draw_glyphs(p2c_device_t *dev,
 // 'draw_type3_glyphs()' - Paint Type 3 glyphs by running their glyph
 //                         procedures in glyph space (PDF 32000-1 9.6.5).
 //
-// Like MuPDF, any visible render mode paints the glyph as its procedure
-// describes, modes 3 and 7 are invisible, and Type 3 glyphs never clip.
-//
 
-static void
-draw_type3_glyphs(p2c_device_t *dev,
-                  const cairo_glyph_t *glyphs,
-                  int num_glyphs)
+static void                                     // O - Void
+draw_type3_glyphs(p2c_device_t *dev,            // I - Active Rendering Context
+                  const cairo_glyph_t *glyphs,  // I - Character codes and positions
+                  int num_glyphs)               // I - Number of glyphs
 {
   graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
   p2c_font_t *font = gs->font;
@@ -331,14 +379,14 @@ draw_type3_glyphs(p2c_device_t *dev,
 }
 
 //
-// 'device_show_text()' - Show a string (Tj): map each code to a glyph, place
-//                        it using the PDF widths and advance Tm (PDF 9.4.4).
+// 'device_show_text()' - Show a string (Tj operator, also used by TJ, ' and
+//                        ").
 //
 
-void 
-device_show_text(p2c_device_t *dev, 
-		 const unsigned char *str,
-		 size_t len) 
+void                                        // O - Void
+device_show_text(p2c_device_t *dev,         // I - Active Rendering Context
+                 const unsigned char *str,  // I - String bytes (character codes)
+                 size_t len)                // I - Number of bytes
 {
   graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
   p2c_font_t *font = gs->font;
@@ -389,10 +437,15 @@ device_show_text(p2c_device_t *dev,
     free(glyphs);
 }
 
-void 
-device_show_text_kerning(p2c_device_t *dev, 
-		    	 operand_t *operands, 
-			 int num_operands) 
+//
+// 'device_show_text_kerning()' - Show strings with individual glyph
+//                                positioning (TJ operator).
+//
+
+void                                           // O - Void
+device_show_text_kerning(p2c_device_t *dev,    // I - Active Rendering Context
+                         operand_t *operands,  // I - TJ array elements (strings, numbers)
+                         int num_operands)     // I - Number of elements
 {
   graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
   for (int i=0; i<num_operands; i++) 
@@ -409,9 +462,14 @@ device_show_text_kerning(p2c_device_t *dev,
   }
 }
 
-void 
-device_set_text_rendering_mode(p2c_device_t *dev, 
-			       int mode) 
+//
+// 'device_set_text_rendering_mode()' - Set the text rendering mode (Tr
+//                                      operator).
+//
+
+void                                               // O - Void
+device_set_text_rendering_mode(p2c_device_t *dev,  // I - Active Rendering Context
+                               int mode)           // I - Text rendering mode (0-7)
 {
   dev->gstack[dev->gstack_ptr].text_rendering_mode = mode;
 }

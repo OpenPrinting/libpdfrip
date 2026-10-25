@@ -211,5 +211,3 @@ device_save_to_png(p2c_device_t *dev, 		// I - Active Rendering context
     fprintf(stderr, "ERROR: Unable to write PNG to '%s'.\n", filename);
   }
 }
-
-

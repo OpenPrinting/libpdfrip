@@ -43,10 +43,6 @@ print_usage(const char *prog_name) // I - Program name
 //
 // 'page_filename()' - Name the PNG of one page of a multi-page render.
 //
-// "out.png" becomes "out-1.png", "out-2.png", ... The page number is
-// zero-padded to the width of the page count (like pdftoppm), so the files
-// sort in page order.
-//
 
 static void
 page_filename(char       *buffer,	// O - Page filename

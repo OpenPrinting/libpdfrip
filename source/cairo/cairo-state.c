@@ -15,7 +15,7 @@
 
 static void 						  // O - Void  
 cmyk_to_rgb(double c, double m, double y, double k, 	// I - c, m, y, k values 
-	    double *r, double *g, double *b)		// I - pointer to r, g, b values
+	          double *r, double *g, double *b)		      // I - pointer to r, g, b values
 {
   // Colour conversion formula
   *r = (1.0 - c) * (1.0 - k);

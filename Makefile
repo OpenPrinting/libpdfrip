@@ -96,6 +96,6 @@ clean:
 	rm -rf build
 
 # --- Dependencies (Manual Header Tracking) ---
-$(OBJS): source/pdf/pdfops-private.h source/cairo/cairo-private.h source/cairo/cairo-device-private.h source/pdf/parser.h
+$(OBJS): source/pdf/pdfops-private.h source/pdf/pdf-image-private.h source/cairo/cairo-private.h source/cairo/cairo-device-private.h source/pdf/parser.h
 $(TEST_OBJ): testpdf2cairo.c test.h
 

@@ -27,37 +27,37 @@ typedef enum operand_type_s
 // Defines a single generic operand on the stack
 typedef struct operand_s
 {
-  operand_type_t type;
-  size_t	 length;		// Number of bytes in value.string
+  operand_type_t  type;
+  size_t	        length;		// Number of bytes in value.string
   union 
   {
-    double number;
-    char name[1024];
-    unsigned char string[1024];		// Raw string bytes (may contain NULs)
+    double          number;
+    char            name[1024];
+    unsigned char   string[1024];	  // Raw string bytes (may contain NULs)
   } value;
 } operand_t;
 
 // A content stream read completely into memory as a list of tokens
 typedef struct pdf_content_s
 {
-  char		*data;			// Tokens, each NUL-terminated
-  size_t	used,			// Bytes used in data
-		alloc;			// Bytes allocated for data
-  size_t	*starts;		// Offset of each token in data
-  size_t	num_tokens,		// Number of tokens
-		alloc_tokens;		// Number of offsets allocated
+  char		    *data;		// Tokens, each NUL-terminated
+  size_t	    used,			// Bytes used in data
+		          alloc;		// Bytes allocated for data
+  size_t	    *starts; 	// Offset of each token in data
+  size_t	    num_tokens,   // Number of tokens
+		          alloc_tokens; // Number of offsets allocated
 } pdf_content_t;
 
 // Context required while running a content stream
 typedef struct parser_context_s
 {
-  p2c_device_t *device;
-  pdfio_dict_t *resources;		// Resources for names used by operators
-  bool		ignore_color;		// Running an uncolored Type 3 glyph (d1)
+  p2c_device_t  *device;
+  pdfio_dict_t  *resources;		  // Resources for names used by operators
+  bool		      ignore_color;		// Running an uncolored Type 3 glyph (d1)
 
-  operand_t *operands;
-  size_t num_operands;
-  size_t operand_capacity;
+  operand_t     *operands;
+  size_t        num_operands;
+  size_t        operand_capacity;
 } parser_context_t;
 
 
@@ -76,5 +76,4 @@ void pdf_content_free(pdf_content_t *content);
 // Run in-memory content with the given resources (forms, Type 3 glyphs)
 void pdf_content_run(p2c_device_t *dev, const pdf_content_t *content, pdfio_dict_t *resources);
 		
-
 #endif // PARSER_H

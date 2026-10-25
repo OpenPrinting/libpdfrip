@@ -28,6 +28,7 @@ static int num_op_counts = 0;
 //
 // 'increment_op_count()' - Find and increment the count for an operator.
 //
+
 static void
 increment_op_count(const char *token)
 {
@@ -60,6 +61,7 @@ increment_op_count(const char *token)
 //
 // 'analyze_content_stream()' -- Count all operators in the content stream.
 //
+
 void
 analyze_content_stream(pdfio_stream_t *st)
 {
