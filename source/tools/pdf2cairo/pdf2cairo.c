@@ -28,13 +28,45 @@ print_usage(const char *prog_name) // I - Program name
   fprintf(stderr, "\nOptions:\n");
   fprintf(stderr, "  --help                 Display this help message and exit.\n");
   fprintf(stderr, "  -o <output.png>        Specify the output PNG filename (render mode).\n");
-  fprintf(stderr, "  -p <pagenum>           Specify the page number to process (default: 1).\n");
+  fprintf(stderr, "                         A multi-page PDF writes one PNG per page:\n");
+  fprintf(stderr, "                         output-1.png, output-2.png, ...\n");
+  fprintf(stderr, "  -p <pagenum>           Render only this page, to the exact output filename\n");
+  fprintf(stderr, "                         (default: every page).\n");
   fprintf(stderr, "  -r <dpi>               Specify the resolution in DPI (default: 72).\n");
   fprintf(stderr, "  -t                     Generate a temporary filename (e.g., 'inputResult123.png').\n");
   fprintf(stderr, "                         Must be used with the -d option.\n");
   fprintf(stderr, "  -d <directory>         Specify the output directory when using -t.\n");
   fprintf(stderr, "  -T                     Generate a temporary filename in 'testfiles/renderer-output/'.\n");
   fprintf(stderr, "  -v                     Enable verbose debugging output.\n"); 
+}
+
+//
+// 'page_filename()' - Name the PNG of one page of a multi-page render.
+//
+// "out.png" becomes "out-1.png", "out-2.png", ... The page number is
+// zero-padded to the width of the page count (like pdftoppm), so the files
+// sort in page order.
+//
+
+static void
+page_filename(char       *buffer,	// O - Page filename
+              size_t     bufsize,	// I - Size of buffer
+              const char *filename,	// I - Output filename
+              size_t     page,		// I - Page number (1-based)
+              size_t     num_pages)	// I - Number of pages
+{
+  const char	*base = strrchr(filename, '/');
+  const char	*ext;
+  int		width = snprintf(NULL, 0, "%zu", num_pages);
+
+  base = base ? base + 1 : filename;
+
+  // Insert the page number before the extension, if there is one
+  if ((ext = strrchr(base, '.')) == NULL || ext == base)
+    ext = filename + strlen(filename);
+
+  snprintf(buffer, bufsize, "%.*s-%0*zu%s", (int)(ext - filename), filename,
+           width, page, ext);
 }
 
 //
@@ -50,8 +82,10 @@ main(int argc, 		// I - Number of command-line args
   // Command-line options
   char 			*input_filename = NULL;		// input PDF filename	
   char 			*output_filename = NULL; 	// output filename
-  int 			pagenum = 1;
-  size_t 		cur_page;			// page iterator
+  char			page_output[1100];		// output filename of one page
+  int 			pagenum = 0;			// page to render, 0 = all
+  size_t 		cur_page,			// page iterator
+			first_page, last_page;		// pages to render (0-based)
   int 			dpi = 72;
   int analyze_mode = 0;
   int opt;
@@ -91,6 +125,12 @@ main(int argc, 		// I - Number of command-line args
       break;
     case 'p':
       pagenum = atoi(optarg);
+      if (pagenum < 1)
+      {
+        fprintf(stderr, "ERROR: Invalid page number '%s'.\n", optarg);
+        print_usage(argv[0]);
+        return (1);
+      }
       break;
     case 'r':
       dpi = atoi(optarg);
@@ -177,8 +217,21 @@ main(int argc, 		// I - Number of command-line args
 
   //pdf FIle processing
   PDF_doc = openPDFfile(input_filename);	
+  if (!PDF_doc)
+    return (1);
 
-  for(cur_page=0; cur_page<PDF_doc->num_pages ; cur_page++)
+  if ((size_t)pagenum > PDF_doc->num_pages)
+  {
+    fprintf(stderr, "ERROR: Page %d does not exist, the PDF has %zu page(s).\n",
+            pagenum, PDF_doc->num_pages);
+    freePDFdoc(PDF_doc);
+    return (1);
+  }
+
+  first_page = pagenum ? (size_t)pagenum - 1 : 0;
+  last_page  = pagenum ? (size_t)pagenum - 1 : PDF_doc->num_pages - 1;
+
+  for(cur_page=first_page; cur_page<=last_page ; cur_page++)
   {
     pdfrip_page_t *page = getPageData(PDF_doc, cur_page); 
     
@@ -228,7 +281,17 @@ main(int argc, 		// I - Number of command-line args
       dev->xobject_dict = xobject_res_obj ? pdfioObjGetDict(xobject_res_obj) : NULL;
 
       process_content_stream(dev, page);
-      device_save_to_png(dev, output_filename);
+
+      // Rendering several pages writes one PNG per page
+      if (output_filename && first_page == last_page)
+        device_save_to_png(dev, output_filename);
+      else if (output_filename)
+      {
+        page_filename(page_output, sizeof(page_output), output_filename,
+                      cur_page + 1, PDF_doc->num_pages);
+        device_save_to_png(dev, page_output);
+      }
+
       device_destroy(dev);
     }
     freePageData(page);

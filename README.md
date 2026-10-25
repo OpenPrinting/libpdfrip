@@ -21,12 +21,13 @@ The following libraries and tools must be installed:
 * cairo (development headers)
 * FreeType (development headers)
 * fontconfig (development headers)
+* libjpeg (development headers)
 * libpng (development headers)
 
 ### Debian/Ubuntu Installation
 
 ```
-sudo apt-get install build-essential pkg-config libpdfio-dev libcairo2-dev libfreetype-dev libfontconfig-dev libpng-dev
+sudo apt-get install build-essential pkg-config libpdfio-dev libcairo2-dev libfreetype-dev libfontconfig-dev libjpeg-dev libpng-dev
 ```
 
 ## Building
@@ -55,16 +56,22 @@ This produces:
 | `--analyze` |                | Analyze PDF content streams instead of rendering output.           |
 | `--help`    |                | Display usage information.                                         |
 | `-o`        | `<output.png>` | Output PNG filename when rendering.                                |
-| `-p`        | `<pagenum>`    | Page number to process (default: 1).                               |
+| `-p`        | `<pagenum>`    | Render only this page (default: every page).                       |
 | `-r`        | `<dpi>`        | Output resolution in DPI (default: 72).                            |
 | `-t`        |                | Generate a temporary output filename (requires `-d`).              |
 | `-d`        | `<directory>`  | Output directory when using `-t`.                                  |
 | `-T`        |                | Generate a temporary filename inside `testfiles/renderer-output/`. |
 | `-v`        |                | Enable verbose diagnostic output.                                  |
 
+Every page is rendered to its own PNG. For a multi-page PDF the page number
+is added to the output filename: `-o output.png` writes `output-1.png`,
+`output-2.png`, and so on (zero-padded, e.g. `output-01.png`, when there are
+10 or more pages). A single-page PDF, or a single page selected with `-p`, is
+written to the output filename unchanged.
+
 ### Examples
 
-Render page 1 to PNG:
+Render every page to PNG (`output.png`, or `output-1.png`, `output-2.png`, ...):
 
 ```
 ./pdf2cairo/pdf2cairo_main -o output.png document.pdf

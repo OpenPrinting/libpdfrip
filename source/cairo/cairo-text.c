@@ -78,58 +78,21 @@ device_set_text_matrix(p2c_device_t *dev,
 
 void
 device_set_font(p2c_device_t *dev,
-                const char *font_name,
+                p2c_font_t *font,
                 double font_size)
 {
-  graphics_state_t *gs;
-  p2c_font_t *active_font = NULL;
+  graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
 
-  if (!dev || !font_name)
-    return;
-
-  gs = &dev->gstack[dev->gstack_ptr];
-
-  /*
-   * Find the font loaded from the page's /Font resource dictionary.
-   * Both names should use the same form, normally "F1" without '/'.
-   */
-  for (size_t i = 0; i < dev->num_fonts; i++)
-  {
-    p2c_font_t *font = dev->fonts[i];
-
-    if (font &&
-        font->ref_font_name &&
-        strcmp(font->ref_font_name, font_name) == 0)
-    {
-      active_font = font;
-      break;
-    }
-  }
-
+  // Fonts are looked up (and warned about) by pdf_find_font()
+  gs->font = font;
   gs->font_size = font_size;
-  gs->font = active_font;
 
-  if (!active_font)
-  {
-    fprintf(stderr,
-            "WARNING: Font resource '%s' was not loaded.\n",
-            font_name);
-    return;
-  }
-
-  if (!active_font->cairo_face)
-  {
-    fprintf(stderr,
-            "WARNING: Font resource '%s' has no Cairo font face.\n",
-            font_name);
-    return;
-  }
-
-  if (g_verbose)
+  if (g_verbose && font)
   {
     fprintf(stderr,
             "DEBUG: Selected font '%s' (%s).\n",
-            font_name, active_font->font_name ? active_font->font_name : "?");
+            font->ref_font_name ? font->ref_font_name : "?",
+            font->font_name ? font->font_name : "?");
   }
 }
 
@@ -301,6 +264,73 @@ draw_glyphs(p2c_device_t *dev,
 }
 
 //
+// 'draw_type3_glyphs()' - Paint Type 3 glyphs by running their glyph
+//                         procedures in glyph space (PDF 32000-1 9.6.5).
+//
+// Like MuPDF, any visible render mode paints the glyph as its procedure
+// describes, modes 3 and 7 are invisible, and Type 3 glyphs never clip.
+//
+
+static void
+draw_type3_glyphs(p2c_device_t *dev,
+                  const cairo_glyph_t *glyphs,
+                  int num_glyphs)
+{
+  graphics_state_t *gs = &dev->gstack[dev->gstack_ptr];
+  p2c_font_t *font = gs->font;
+  cairo_matrix_t text_matrix = gs->text_matrix, glyph_matrix, check;
+  int level = dev->gstack_ptr;
+  int verbose = g_verbose;
+
+  // A Type 3 glyph showing Type 3 text could recurse without bound
+  if (gs->text_rendering_mode == 3 || gs->text_rendering_mode == 7 ||
+      !font->type3_procs || dev->in_type3_glyph)
+    return;
+
+  // Glyph space -> text space: /FontMatrix, then the Tfs x Th scaling
+  cairo_matrix_init(&glyph_matrix,
+                    gs->font_size * gs->horiz_scaling, 0,
+                    0, gs->font_size,
+                    0, 0);
+  cairo_matrix_multiply(&glyph_matrix, &font->font_matrix, &glyph_matrix);
+
+  // "0 Tf" or a degenerate matrix would put cairo into an error state
+  cairo_matrix_multiply(&check, &glyph_matrix, &text_matrix);
+  if (cairo_matrix_invert(&check) != CAIRO_STATUS_SUCCESS)
+    return;
+
+  // Glyph procedures run once per glyph; keep -v output readable
+  g_verbose = 0;
+  dev->in_type3_glyph = true;
+
+  for (int i = 0; i < num_glyphs; i ++)
+  {
+    const pdf_content_t *proc = font->type3_procs[glyphs[i].index & 255];
+
+    if (!proc)
+      continue;
+
+    device_save_state(dev);
+    if (dev->gstack_ptr == level)
+      break;				// Graphics state stack is full
+
+    // Glyph procedures inherit the graphics state, including the fill color
+    cairo_transform(dev->cr, &text_matrix);
+    cairo_translate(dev->cr, glyphs[i].x, glyphs[i].y);
+    cairo_transform(dev->cr, &glyph_matrix);
+
+    pdf_content_run(dev, proc, font->resources);
+
+    // Also undoes any unbalanced q inside the glyph procedure
+    while (dev->gstack_ptr > level)
+      device_restore_state(dev);
+  }
+
+  dev->in_type3_glyph = false;
+  g_verbose = verbose;
+}
+
+//
 // 'device_show_text()' - Show a string (Tj): map each code to a glyph, place
 //                        it using the PDF widths and advance Tm (PDF 9.4.4).
 //
@@ -348,7 +378,9 @@ device_show_text(p2c_device_t *dev,
     x += tx * gs->horiz_scaling;
   }
 
-  if (font->cairo_face)
+  if (font->is_type3)
+    draw_type3_glyphs(dev, glyphs, (int)num_glyphs);
+  else if (font->cairo_face)
     draw_glyphs(dev, glyphs, (int)num_glyphs);
 
   cairo_matrix_translate(&gs->text_matrix, x, 0);

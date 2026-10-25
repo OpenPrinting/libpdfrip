@@ -118,6 +118,93 @@ getPageData(pdfrip_doc_t *pdf_doc,	// I - PDF file
 }
 
 //
+// 'pdf_dict_get_dict()' - Get a dictionary value, following an indirect reference.
+//
+// pdfioDictGetDict() only returns *direct* dictionaries, but values such as
+// /FontDescriptor are almost always indirect ("7 0 R").
+//
+
+pdfio_dict_t *				  // O - Dictionary or NULL
+pdf_dict_get_dict(pdfio_dict_t *dict,	// I - Dictionary
+                  const char   *key)	// I - Key
+{
+  pdfio_dict_t *value = pdfioDictGetDict(dict, key);
+
+  return value ? value : pdfioObjGetDict(pdfioDictGetObj(dict, key));
+}
+
+//
+// 'pdf_dict_get_array()' - Get an array value, following an indirect reference.
+//
+
+pdfio_array_t *				  // O - Array or NULL
+pdf_dict_get_array(pdfio_dict_t *dict,	// I - Dictionary
+                   const char   *key)	// I - Key
+{
+  pdfio_array_t *value = pdfioDictGetArray(dict, key);
+
+  return value ? value : pdfioObjGetArray(pdfioDictGetObj(dict, key));
+}
+
+//
+// 'pdf_read_stream()' - Read a whole stream object into memory.
+//
+// With decode false the data is returned as stored, e.g. the JPEG data of a
+// DCTDecode image (PDFio itself can only decode FlateDecode).
+//
+
+unsigned char *				  // O - Data (free with free()) or NULL
+pdf_read_stream(pdfio_obj_t *obj,	// I - Stream object
+                bool        decode,	// I - Decode the stream filter?
+                size_t      *size)	// O - Number of bytes
+{
+  pdfio_stream_t *st;
+  size_t	capacity = 64 * 1024, total = 0;
+  unsigned char	*buffer, *temp;
+  ssize_t	bytes;
+
+  *size = 0;
+
+  if (!obj || (st = pdfioObjOpenStream(obj, decode)) == NULL)
+    return (NULL);
+
+  if ((buffer = malloc(capacity)) == NULL)
+  {
+    pdfioStreamClose(st);
+    return (NULL);
+  }
+
+  while ((bytes = pdfioStreamRead(st, buffer + total, capacity - total)) > 0)
+  {
+    total += (size_t)bytes;
+
+    if (total == capacity)
+    {
+      if ((temp = realloc(buffer, capacity * 2)) == NULL)
+      {
+        free(buffer);
+        pdfioStreamClose(st);
+        return (NULL);
+      }
+
+      buffer = temp;
+      capacity *= 2;
+    }
+  }
+
+  pdfioStreamClose(st);
+
+  if (total == 0)
+  {
+    free(buffer);
+    return (NULL);
+  }
+
+  *size = total;
+  return (buffer);
+}
+
+//
 // 'freePageData()' - free Page data structure
 //
 

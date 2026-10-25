@@ -37,19 +37,27 @@ typedef struct operand_s
   } value;
 } operand_t;
 
-// Context required while parsing the Content stream
+// A content stream read completely into memory as a list of tokens
+typedef struct pdf_content_s
+{
+  char		*data;			// Tokens, each NUL-terminated
+  size_t	used,			// Bytes used in data
+		alloc;			// Bytes allocated for data
+  size_t	*starts;		// Offset of each token in data
+  size_t	num_tokens,		// Number of tokens
+		alloc_tokens;		// Number of offsets allocated
+} pdf_content_t;
+
+// Context required while running a content stream
 typedef struct parser_context_s
 {
   p2c_device_t *device;
-  pdfrip_page_t *page_data;
-  pdfio_dict_t *resources;
+  pdfio_dict_t *resources;		// Resources for names used by operators
+  bool		ignore_color;		// Running an uncolored Type 3 glyph (d1)
 
   operand_t *operands;
   size_t num_operands;
   size_t operand_capacity;
-
-  char *token;
-  size_t token_capacity;
 } parser_context_t;
 
 
@@ -57,10 +65,16 @@ typedef struct parser_context_s
  * @brief Processes a PDF content stream and uses a device to render it
  *
  * @param[in] dev The rendering device to draw with
- * @param[in] st The PDF content stream to read the commands from.
- * @param[in] resources The page's resource dictionary.
+ * @param[in] page_data The page whose content streams are drawn.
  */
 void process_content_stream(p2c_device_t *dev, pdfrip_page_t *page_data);
+
+// Read the content stream of a form XObject or Type 3 glyph into memory
+bool pdf_content_load(pdf_content_t *content, pdfio_obj_t *obj);
+void pdf_content_free(pdf_content_t *content);
+
+// Run in-memory content with the given resources (forms, Type 3 glyphs)
+void pdf_content_run(p2c_device_t *dev, const pdf_content_t *content, pdfio_dict_t *resources);
 		
 
 #endif // PARSER_H

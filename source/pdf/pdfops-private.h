@@ -15,6 +15,7 @@
 #include "../cairo/cairo-device-private.h"
 
 typedef struct cairo_device_s p2c_device_t;
+typedef struct p2c_font_s p2c_font_t;
 
 typedef struct pdfrip_doc_s
 {
@@ -45,7 +46,16 @@ typedef struct pdfrip_page_s
 pdfrip_page_t* getPageData(pdfrip_doc_t *pdf_doc, size_t page_number); // get Page Data from PDF
 void freePageData(pdfrip_page_t *page);
 
+// Dictionary helpers that also follow indirect references ("7 0 R")
+pdfio_dict_t  *pdf_dict_get_dict(pdfio_dict_t *dict, const char *key);
+pdfio_array_t *pdf_dict_get_array(pdfio_dict_t *dict, const char *key);
+unsigned char *pdf_read_stream(pdfio_obj_t *obj, bool decode, size_t *size);
+
+// Image XObjects
+void pdf_draw_image(p2c_device_t *dev, pdfio_obj_t *obj, pdfio_dict_t *resources);
+
 // Text helper functions
 bool getPageFonts(p2c_device_t *dev);
+p2c_font_t *pdf_find_font(p2c_device_t *dev, pdfio_dict_t *resources, const char *name);
 bool load_encoding(pdfio_dict_t *font_dict, int encoding[256], const char *names[256]);
 #endif //PDFOPS_PRIVATE_H

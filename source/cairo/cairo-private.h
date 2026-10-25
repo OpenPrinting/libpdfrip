@@ -24,6 +24,7 @@ extern int g_verbose;
 typedef struct p2c_font_s p2c_font_t;
 
 #define MAX_GSTATE 64 // Maximum nesting of graphics states
+#define MAX_FORM_DEPTH 16 // Maximum nesting of form XObjects
 
 // Internal color space representation
 typedef enum
@@ -69,12 +70,14 @@ typedef struct p2c_cid_width_s
 // Internal Fonts objects
 typedef struct p2c_font_s
 {
-  const char	*ref_font_name;		// PDF font reference Name e.g. "F1"
+  char		*ref_font_name;		// PDF font reference Name e.g. "F1"
+  pdfio_dict_t	*dict;			// Font dictionary (identifies a loaded font)
   const char   	*font_name;    		// Original Font Name e.g. "BCDEEE+Calibri"
   const char	*subtype;		// Font Subtype e.g. "TrueType", "Type0"
   int		flags;			// FontDescriptor /Flags
   bool		is_embedded;		// Font program came from the PDF
   bool		is_cid;			// Type0 font: 2-byte codes, CID -> GID
+  bool		is_type3;		// Glyphs are content streams (/CharProcs)
 
   uint8_t   	*data;         		// Font Binary data (owned by cairo_face once created)
   size_t    	data_size;     		// size of data
@@ -97,6 +100,11 @@ typedef struct p2c_font_s
   p2c_cid_width_t *cid_widths;		// Sorted /W ranges
   size_t	num_cid_widths;
   double	default_width;		// /DW
+
+  // Type 3 fonts
+  cairo_matrix_t font_matrix;		// /FontMatrix: glyph space -> text space
+  pdf_content_t	**type3_procs;		// Code -> glyph procedure (256 entries)
+  pdfio_dict_t	*resources;		// Resources used by the glyph procedures
 
   FT_Face       ft_face;            	// Active FreeType face object initialized from 'data'
   cairo_font_face_t *cairo_face; 	// The face created for Cairo
@@ -122,6 +130,12 @@ struct cairo_device_s
   // Glyph outlines collected by clipping text render modes (4-7) until ET
   cairo_path_t		**text_clip_paths;
   size_t		num_text_clip_paths;
+
+  // Form XObjects being run (to stop a form from drawing itself) and whether
+  // a Type 3 glyph procedure is running
+  pdfio_obj_t		*forms[MAX_FORM_DEPTH];
+  int			num_forms;
+  bool			in_type3_glyph;
 
   // TODO: For XOBJECTS
   pdfio_dict_t 		*xobject_dict;

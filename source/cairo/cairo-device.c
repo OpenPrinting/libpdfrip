@@ -114,6 +114,22 @@ p2c_font_destroy(p2c_font_t *font)
   free(font->widths);
   free(font->cid_to_gid);
   free(font->cid_widths);
+
+  if (font->type3_procs)
+  {
+    for (int i = 0; i < 256; i ++)
+    {
+      if (font->type3_procs[i])
+      {
+        pdf_content_free(font->type3_procs[i]);
+        free(font->type3_procs[i]);
+      }
+    }
+
+    free(font->type3_procs);
+  }
+
+  free(font->ref_font_name);
   free(font);
 }
 

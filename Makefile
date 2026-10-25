@@ -26,8 +26,8 @@ CFLAGS   = -g -Wall -Isource/pdf -Isource/cairo -Isource/tools/pdf2cairo
 PDFIO_CFLAGS   = $(shell pkg-config --cflags pdfio)
 PDFIO_LIBS     = $(shell pkg-config --libs pdfio)
 
-CAIRO_CFLAGS   = $(shell pkg-config --cflags cairo-ft cairo freetype2 fontconfig)
-CAIRO_LIBS     = $(shell pkg-config --libs cairo-ft cairo freetype2 fontconfig) -lpng16 -lz -lm -lcairo -ljpeg
+CAIRO_CFLAGS   = $(shell pkg-config --cflags cairo-ft cairo freetype2 fontconfig libjpeg)
+CAIRO_LIBS     = $(shell pkg-config --libs cairo-ft cairo freetype2 fontconfig libjpeg) -lpng16 -lz -lm -lcairo -ljpeg
 
 # --- Final Build Flags ---
 BUILD_CFLAGS = $(CFLAGS) $(PDFIO_CFLAGS) $(CAIRO_CFLAGS)
@@ -39,6 +39,7 @@ SRCS_TOOL  = source/tools/pdf2cairo/pdf2cairo.c
 
 # 2. The Cairo Backend (in source/cairo)
 SRCS_CAIRO = source/cairo/cairo-device.c \
+             source/cairo/cairo-image.c \
              source/cairo/cairo-path.c \
              source/cairo/cairo-state.c \
              source/cairo/cairo-text.c
@@ -46,6 +47,7 @@ SRCS_CAIRO = source/cairo/cairo-device.c \
 # 3. The PDF Operations (in source/pdf)
 SRCS_PDF   = source/pdf/pdfops.c \
              source/pdf/parser.c \
+	     source/pdf/pdf-image.c \
 	     source/pdf/pdf-text.c
 
 # Combine all sources
