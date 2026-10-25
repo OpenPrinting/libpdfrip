@@ -33,7 +33,7 @@ print_usage(const char *prog_name) // I - Program name
   fprintf(stderr, "  -p <pagenum>           Render only this page, to the exact output filename\n");
   fprintf(stderr, "                         (default: every page).\n");
   fprintf(stderr, "  -r <dpi>               Specify the resolution in DPI (default: 72).\n");
-  fprintf(stderr, "  -t                     Generate a temporary filename (e.g., 'inputResult123.png').\n");
+  fprintf(stderr, "  -t                     Generate an output filename from the input name (e.g., 'input.png').\n");
   fprintf(stderr, "                         Must be used with the -d option.\n");
   fprintf(stderr, "  -d <directory>         Specify the output directory when using -t.\n");
   fprintf(stderr, "  -T                     Generate a temporary filename in 'testfiles/renderer-output/'.\n");
@@ -185,8 +185,7 @@ main(int argc, 		// I - Number of command-line args
       char name_without_ext[256];
       strncpy(name_without_ext, basename, len);
       name_without_ext[len] = '\0';
-      int random_num = rand() % 1000;
-      snprintf(temp_output_filename, sizeof(temp_output_filename), "%s/%sResult%03d.png", output_dir, name_without_ext, random_num);
+      snprintf(temp_output_filename, sizeof(temp_output_filename), "%s/%s.png", output_dir, name_without_ext);
       output_filename = temp_output_filename;
     }
     else if (T_flag)
@@ -199,8 +198,7 @@ main(int argc, 		// I - Number of command-line args
       char name_without_ext[256];
       strncpy(name_without_ext, basename, len);
       name_without_ext[len] = '\0';
-      int random_num = rand() % 1000;
-      snprintf(temp_output_filename, sizeof(temp_output_filename), "%s/%sResult%03d.png", fixed_dir, name_without_ext, random_num);
+      snprintf(temp_output_filename, sizeof(temp_output_filename), "%s/%s.png", fixed_dir, name_without_ext);
       output_filename = temp_output_filename;
     }
     if (output_filename == NULL)
