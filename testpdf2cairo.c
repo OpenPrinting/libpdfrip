@@ -31,6 +31,7 @@ static const char *output_path = "testfiles/renderer-output/text/";
 static renderer_test_t manual_tests[] = 
 {
   { "test_file_1pg", 		"full_pdf/test_file_1pg.pdf", 	"", "T", ""},
+  { "test_file_4pg", 		"full_pdf/test_file_4pg.pdf", 	"", "T", ""},
   { "Stroked box", 		"shapes/01_stroked_box.pdf", 		"", "T", "" },
   { "Filled RGB box", 		"shapes/02_filled_box_rgb.pdf", 	"", "T", ""},
   { "Nested Box", 		"shapes/03_nested_state.pdf", 		"", "T", ""},
@@ -59,6 +60,9 @@ static renderer_test_t manual_tests[] =
   { "TextColumnWise", 		"text/TextColumnWise.pdf", 	"", "T", ""},
   { "TextColumnWithMultipleFont", "text/TextColumnWithMultipleFont.pdf", "", "T", ""},
   { "TextWithShape", 		"text/TextWithShape.pdf", 	"", "T", ""},
+  { "Arabic text", "non-latin-text/non-latin tcs/output files/output_text_arabic.pdf", "", "T", ""},
+  { "Greek text", "non-latin-text/non-latin tcs/output files/output_text_greek.pdf", "", "T", ""},
+  { "Russian text", "non-latin-text/non-latin tcs/output files/output_text_russian.pdf", "", "T", ""},
 };
 
 // Main()
@@ -85,7 +89,7 @@ int main(void)
     testBegin(" Manual Test: %s", manual_tests[i].description);
     
     // Construct command with specific flags (o, d, or T)
-    snprintf(command, sizeof(command), "./source/tools/pdf2cairo/pdf2cairo %s %s%s",
+    snprintf(command, sizeof(command), "./source/tools/pdf2cairo/pdf2cairo %s \"%s%s\"",
              manual_tests[i].input_args, input_path, manual_tests[i].input_file);
 
     if (strcmp(manual_tests[i].output_option, "o") == 0) {
